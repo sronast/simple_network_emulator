@@ -3,6 +3,10 @@ import socket
 import threading
 import select
 import signal
+import pickle
+
+#
+from frame import Frame
 
 class Client:
     def __init__(self, host, port):
@@ -25,8 +29,11 @@ class Client:
                 for sock in read_sockets:
                     #if client receives message from the server
                     if sock == self.client_socket:
-                        message = self.client_socket.recv(self.LENGTH).decode(self.MESSAGE_FORMAT)
+                        message = self.client_socket.recv(self.LENGTH)
+                        print(message)
                         if message:
+                            message = pickle.loads(message)
+                            print('Message from the server')
                             print(message)
                         #if message is empty, the server has died
                         else:
@@ -35,7 +42,7 @@ class Client:
                     #if client needs to send message to the server
                     else:
                         message = sys.stdin.readline()
-                        self.client_socket.send(message.encode(self.MESSAGE_FORMAT))  
+                        self.client_socket.send(pickle.dumps({'message': message}))  
         #if client is closed by keyboard interruption.
         except KeyboardInterrupt:
             print('\n!!! Keyboard interrupt !!!')
