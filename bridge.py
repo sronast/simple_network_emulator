@@ -137,6 +137,10 @@ class Bridge:
                                 if source_mac not in self.bridge_table:
                                     self.bridge_table[source_mac] = port_of_bridge
                                     self.reverse_bridge_table[port_of_bridge] = source_mac
+# <<<<<<< rs
+                                
+# =======
+# >>>>>>> main
                                 #check if destination mac is in the bridge table
                                 #true pass the frame to that station
                                 if destination_mac in self.bridge_table:
@@ -148,6 +152,11 @@ class Bridge:
                                 else:
                                     #if destination mac address not in the bridge table broadcast the frame
                                     self.broadcast(message, source_mac)
+# <<<<<<< rs
+
+                                
+# =======
+# >>>>>>> main
                             print('available prots: ', self.available_ports)   
                             print('used ports: ', self.used_ports)   
                         except:
