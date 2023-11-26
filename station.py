@@ -1,9 +1,24 @@
+import os
+import json
+import fcntl
+import errno
 import sys
 import socket
 import pickle
 import select
 import threading
-from utils import *
+import time
+from queue import Queue
+
+HEADER_LENGTH = 1024
+
+class ARPPacket:
+    def __init__(self, operation, sender_ip, sender_mac, target_ip, target_mac=None):
+        self.operation = operation
+        self.sender_ip = sender_ip
+        self.sender_mac = sender_mac
+        self.target_ip = target_ip
+        self.target_mac = target_mac
 
 # ARPCache class
 class ARPCache:
@@ -48,16 +63,194 @@ def create_arp_request(sender_ip, sender_mac, target_ip):
 
 class Station:
     def __init__(self, ip_address, mac_address):
+        self.my_username = ip_address
         self.ip_address = ip_address
         self.mac_address = mac_address
-        self.pending_queue = []
+        self.pending_queue = Queue()
         self.arp_table = ARPCache()
-        self.routing_table = RoutingTable()
+        self.forwarding_table = RoutingTable()
         self.HOST = socket.gethostbyname('localhost')
         self.LENGTH = 4096
         self.all_connections = set()
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client_socket.settimeout(2)
+        self.hostname_mapping = {}
+        self.connected_lans = {}
+        self.host_name = load_from_json_file('hostname.json')
+        self.routing_table = load_from_json_file('routingtable.json')
+        self.interface_info = load_from_json_file('interface.json')
+
+    def main_loop(self):
+        threading.Thread(target=self.send_arp_requests).start()
+
+        while True:
+            # Simulate user input
+            user_input = input("Enter message: ")
+            destination_ip = input("Enter destination IP: ")
+            self.send_message(destination_ip, user_input)
+
+            # Simulate receiving frames
+            time.sleep(1)
+            self.receive_frame()
+            
+            # Check for incoming Ethernet frames
+            received_frame = self.receive_frame()
+
+            if received_frame:
+                frame_type = self.get_frame_type(received_frame)
+
+                if frame_type == "IP":
+                    # Process IP packet
+                    ip_packet = self.extract_ip_packet(received_frame)
+                    self.process_ip_packet(ip_packet)
+
+                elif frame_type == "ARP":
+                    # Process ARP packet
+                    arp_packet = self.extract_arp_packet(received_frame)
+                    self.process_arp_packet(arp_packet)
+
+            # Check pending queue for IP packets waiting for ARP resolution
+            if not self.pending_queue.empty():
+                pending_ip_packet = self.pending_queue.get()
+                self.encapsulate_ip_packet(pending_ip_packet['destination_ip'], pending_ip_packet['message'])
+
+    def process_arp_packet(self, arp_packet):
+        if arp_packet.operation == "request":
+            if arp_packet.target_ip == self.ip_address:
+                # This station is the target of the ARP request
+                # Send ARP reply back to the source with a local MAC address
+                self.arp_reply(arp_packet.sender_ip, arp_packet.sender_mac)
+
+        elif arp_packet.operation == "reply":
+            # Store the mapping between source IP and MAC address in ARP cache
+            self.arp_table.add_mapping(arp_packet.sender_ip, arp_packet.sender_mac)
+
+            # Check pending queue for IP packets waiting for ARP resolution
+            if not self.pending_queue.empty():
+                pending_ip_packet = self.pending_queue.get()
+                self.encapsulate_ip_packet(pending_ip_packet['destination_ip'], pending_ip_packet['message'])
+
+    def encapsulate_ip_packet(self, destination_ip, message):
+        # Create an IP packet with header and message
+        # Consult the forwarding table to determine the next-hop IP address
+        next_hop_ip = self.forwarding_table.get_next_hop(destination_ip)
+
+        # Use ARP to find the MAC address of the next-hop router or destination
+        next_hop_mac = self.arp_table.get_mac_address(next_hop_ip)
+
+        if next_hop_mac is None:
+            # If MAC address is not known, send an ARP request to discover it
+            self.arp_request(next_hop_ip)
+            # Wait for ARP reply (may need to implement a timeout)
+            next_hop_mac = self.arp_table.get_mac_address(next_hop_ip)
+
+        # Create the IP packet and pass it to the MAC layer for further encapsulation
+        ip_packet = self.create_ip_packet(destination_ip, next_hop_ip, message)
+        self.send_to_mac_layer(next_hop_mac, ip_packet)
+
+    def enqueue_pending_ip_packet(self, destination_ip, message):
+        # Enqueue the IP packet for which ARP resolution is pending
+        self.pending_queue.put({'destination_ip': destination_ip, 'message': message})
+        
+    def set_socket_nonblocking(self, sock):
+        # Set the socket to non-blocking mode
+        flags = fcntl.fcntl(sock, fcntl.F_GETFL)
+        fcntl.fcntl(sock, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+
+    def connect_to_lans(self):
+        for interface, bridge_info in self.interface_info.items():
+            bridge_name, bridge_port = bridge_info.split()
+            ip_address = self.hostname_mapping.get(bridge_name)
+            if ip_address:
+                try:
+                    # Initialize a TCP socket connection to the bridge
+                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                        self.set_socket_nonblocking(s)
+                        s.connect((ip_address, int(bridge_port)))
+                        retries = 5
+                        wait_time = 2  # seconds
+                        for _ in range(retries):
+                            ready_to_read, _, _ = select.select([s], [], [], wait_time)
+                            if ready_to_read:
+                                response = s.recv(HEADER_LENGTH).decode('utf-8')
+                                if response == 'accept':
+                                    self.connected_lans[interface] = s
+                                    print(f"Connected to {bridge_name} on interface {interface}")
+                                    break
+                                else:
+                                    print(f"Connection to {bridge_name} on interface {interface} rejected")
+                                    break
+                            else:
+                                print(f"Retrying connection to {bridge_name} on interface {interface}")
+                        else:
+                            print(f"Failed to connect to {bridge_name} on interface {interface}")
+                except Exception as e:
+                    print(f"Error connecting to {bridge_name}: {e}")
+
+    def send_messages(self, client_socket):
+        while True:
+            try:
+                # Wait for the user to input a message
+                message = input('{} > '.format(self.my_username))
+                # If the message is not empty - send it
+                if message:
+                    message = message.encode('utf-8')
+                    message_header = "{:<{}}".format(len(message), HEADER_LENGTH).encode('utf-8')
+                    client_socket.send(message_header + message)
+            except KeyboardInterrupt:
+                print('Closing Connection!')
+                sys.exit()
+
+    def receive_messages(self):
+        while True:
+            for interface, client_socket in self.connected_lans.items():
+                ready_to_read, _, _ = select.select([client_socket], [], [], 0.1)
+                if ready_to_read:
+                    try:
+                        # Header contains the length of the message
+                        username_header = client_socket.recv(HEADER_LENGTH)
+
+                        # If no data is received, the connection with the server is closed
+                        if not len(username_header):
+                            print('Connection closed by the server')
+                            sys.exit()
+
+                        # Convert header to int value
+                        username_length = int(username_header.decode('utf-8').strip())
+
+                        # Receive and decode username
+                        username = client_socket.recv(username_length).decode('utf-8')
+
+                        # Now do the same for the message
+                        message_header = client_socket.recv(HEADER_LENGTH)
+                        message_length = int(message_header.decode('utf-8').strip())
+                        message = client_socket.recv(message_length).decode('utf-8')
+
+                        if message is False:
+                            print('Closed connection from: {}'.format(username))
+                            continue
+
+                        # Print message
+                        print('\nReceived message from {} > {}\n{} > '.format(username, message, self.my_username), end='')
+
+                        if username == self.my_username:
+                            print('Close Connection and Try Again!')
+
+                    except KeyboardInterrupt:
+                        print('Closing Connection!')
+                        sys.exit()
+
+                    except IOError as e:
+                        if e.errno != errno.EAGAIN and e.errno != errno.EWOULDBLOCK:
+                            print('Reading error: {}'.format(str(e)))
+                            sys.exit()
+                        # We just did not receive anything
+                        continue
+
+                    except Exception as e:
+                        # Any other exception - something happened, exit
+                        print('Reading error: '.format(str(e)))
+                        sys.exit()
 
     def send_message(self, destination_ip, message):
         destination_mac = self.arp_table.get_mac_address(destination_ip)
@@ -66,7 +259,7 @@ class Station:
             self.client_socket.send(frame)
         else:
             self.send_arp_request(destination_ip)
-            self.pending_queue.append({'destination_ip': destination_ip, 'message': message})
+            self.pending_queue.put({'destination_ip': destination_ip, 'message': message})
 
     def send_arp_request(self, destination_ip):
         arp_request = create_arp_request(self.ip_address, self.mac_address, destination_ip)
@@ -85,9 +278,9 @@ class Station:
             pass
 
     def process_frame(self, frame):
-        source_mac = frame.source_mac
-        destination_mac = frame.destination_mac
-        message = frame.message
+        source_mac = frame['source_mac']
+        destination_mac = frame['destination_mac']
+        message = frame['message']
 
         if destination_mac == self.mac_address:
             print(f"Received message: {message} from {source_mac}")
@@ -99,7 +292,7 @@ class Station:
             self.client_socket.connect((self.HOST, 5000))
             self.all_connections.add(self.client_socket)
             print('Connected to the bridge!')
-            threading.Thread(target=self.send_messages).start()
+            threading.Thread(target=self.send_messages, args=(self.client_socket,)).start()
 
             while True:
                 read_sockets, _, _ = select.select(list(self.all_connections), [], [])
@@ -113,14 +306,37 @@ class Station:
         finally:
             self.client_socket.close()
 
-    def send_messages(self):
-        while True:
-            user_input = input("Enter message: ")
-            destination_ip = input("Enter destination IP: ")
-            self.send_message(destination_ip, user_input)
-
     def close(self):
         self.client_socket.close()
+
+def load_from_json_file(file_name):
+    try:
+        with open(file_name, 'r') as f:
+            # For interface and hostname files
+            if 'interface' in file_name or 'hostname' in file_name:
+                # Assuming tab-separated values
+                data = [line.strip().split('\t') for line in f]
+
+                # Create a dictionary
+                all_data = {row[0]: row[1:] for row in data}
+
+            # For routing table file
+            elif 'routingtable' in file_name:
+                # Assuming space-separated values
+                data = [line.strip().split() for line in f]
+
+                # Create a list of dictionaries
+                all_data = [{'destination': row[0], 'next_hop': row[1], 'subnet_mask': row[2], 'interface': row[3]} for row in data]
+
+            else:
+                # Unsupported file type
+                all_data = None
+
+    except FileNotFoundError:
+        # If the file is not found, return None
+        all_data = None
+
+    return all_data
 
 if __name__ == '__main__':
     assert len(sys.argv) == 3, 'Usage: python3 station.py ip_address mac_address'
