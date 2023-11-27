@@ -56,6 +56,15 @@ def load_from_json_file(file_name):
 
     return all_data
 
+def load_hostname(file_path):
+    try:
+        with open(file_path, 'r') as f:
+            hostnames = json.load(f)
+        
+    except FileNotFoundError:
+        pass
+
+
 def load_hostname_file(self, file_path):
     with open(file_path, 'r') as file:
         for line in file:
