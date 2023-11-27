@@ -80,12 +80,15 @@ class Station:
         
         '''
         Station info
-                {
-                "stations":["R3-cs1","R3-cs2"],
-                "R3-cs1": {"ip":"128.252.11.49","mask":"255.255.255.0",
-                            "mac":"08:40:20:75:41:85","lan":"cs1"},
-                "R3-cs2": {"ip":"128.252.13.45","mask":"255.255.255.224","mac":"08:40:20:02:97:AB","lan":"cs2"}
-    }
+            {   
+                "stations":["D"],
+                "D": {
+                    "ip":"128.252.13.67",
+                    "mask":"255.255.255.224",
+                    "mac":"00:00:0C:04:52:67",
+                    "lan":"cs3"
+                }
+            }
         '''
         self.station_info = load_json_file(interface_file)
 
@@ -110,7 +113,7 @@ class Station:
 
         #if station has only one ip
         '''Need to handle case where 2 ips are associated with a station'''
-        self.station_name = list(self.station_info.keys())[0]
+        self.station_name = self.station_info["stations"][0]
 
         self.my_username = self.station_info[self.station_name]['ip']
         self.ip_address = self.station_info[self.station_name]['ip']
@@ -125,9 +128,11 @@ class Station:
         self.client_socket.settimeout(2)
         self.hostname_mapping = {}
         self.connected_lans = {}
-        self.host_name = load_from_json_file('hostname.json')
-        self.routing_table = load_from_json_file('routingtable.json')
-        self.interface_info = load_from_json_file('interface.json')
+
+        # self.lan_name = self.station_info[station]["lan"]
+        # self.host_name = load_from_json_file('hostname.json')
+        # self.routing_table = load_from_json_file('routingtable.json')
+        # self.interface_info = load_from_json_file('interface.json')
 
     def main_loop(self):
         threading.Thread(target=self.send_arp_requests).start()
@@ -207,15 +212,23 @@ class Station:
         fcntl.fcntl(sock, fcntl.F_SETFL, flags | os.O_NONBLOCK)
 
     def connect_to_lans(self):
-        for interface, bridge_info in self.interface_info.items():
-            bridge_name, bridge_port = bridge_info.split()
-            ip_address = self.hostname_mapping.get(bridge_name)
-            if ip_address:
-                try:
+        ####### RS ######
+        for interface in self.station_info["stations"]:
+            bridge_name = self.station_info[interface]["lan"]
+            #check if there is an active lan with lan_name
+            all_bridges = load_json_file('all_lans.json')
+            if bridge_name not in all_bridges:
+                print("No active lan with the given name")
+                sys.exit(0)
+            lan_info = load_json_file(f'bridge_{bridge_name}.json')
+            bridge_ip = lan_info['ip']
+            bridge_port = lan_info['port']
+
+            try:
                     # Initialize a TCP socket connection to the bridge
                     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                         self.set_socket_nonblocking(s)
-                        s.connect((ip_address, int(bridge_port)))
+                        s.connect((bridge_ip, int(bridge_port)))
                         retries = 5
                         wait_time = 2  # seconds
                         for _ in range(retries):
@@ -233,8 +246,38 @@ class Station:
                                 print(f"Retrying connection to {bridge_name} on interface {interface}")
                         else:
                             print(f"Failed to connect to {bridge_name} on interface {interface}")
-                except Exception as e:
-                    print(f"Error connecting to {bridge_name}: {e}")
+            except Exception as e:
+                print(f"Error connecting to {bridge_name}: {e}")
+        ########### RS #######
+
+        # for interface, bridge_info in self.interface_info.items():
+        #     bridge_name, bridge_port = bridge_info.split()
+        #     ip_address = self.hostname_mapping.get(bridge_name)
+        #     if ip_address:
+        #         try:
+        #             # Initialize a TCP socket connection to the bridge
+        #             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        #                 self.set_socket_nonblocking(s)
+        #                 s.connect((ip_address, int(bridge_port)))
+        #                 retries = 5
+        #                 wait_time = 2  # seconds
+        #                 for _ in range(retries):
+        #                     ready_to_read, _, _ = select.select([s], [], [], wait_time)
+        #                     if ready_to_read:
+        #                         response = s.recv(HEADER_LENGTH).decode('utf-8')
+        #                         if response == 'accept':
+        #                             self.connected_lans[interface] = s
+        #                             print(f"Connected to {bridge_name} on interface {interface}")
+        #                             break
+        #                         else:
+        #                             print(f"Connection to {bridge_name} on interface {interface} rejected")
+        #                             break
+        #                     else:
+        #                         print(f"Retrying connection to {bridge_name} on interface {interface}")
+        #                 else:
+        #                     print(f"Failed to connect to {bridge_name} on interface {interface}")
+        #         except Exception as e:
+        #             print(f"Error connecting to {bridge_name}: {e}")
 
     def send_messages(self, client_socket):
         while True:
@@ -450,20 +493,21 @@ class Router(Station):
                 self.encapsulate_ip_packet(pending_ip_packet['destination_ip'], pending_ip_packet['message'])
 
 if __name__ == '__main__':
-    assert len(sys.argv) == 4, 'Usage: python -no/route station.py interface routingtable hostname'
+    assert len(sys.argv) == 5, 'Usage: python station.py -no/route interface routingtable hostname'
     is_router = sys.argv[1] == "-route"
 
     inerface_file = sys.argv[2]
     routingtable_file = sys.argv[3]
     hostname_file = sys.argv[4]
 
-    # is_router = input("Is this station a router? (y/n): ").lower() == 'y'
+    is_router = input("Is this station a router? (y/n): ").lower() == 'y'
 
     if is_router:
-        router = Router(ip_address, mac_address)
-        router.connect_to_bridges()
-        router.start()
-        router.close()
+        pass
+        # router = Router(ip_address, mac_address)
+        # router.connect_to_bridges()
+        # router.start()
+        # router.close()
     else:
         station = Station(inerface_file, routingtable_file, hostname_file)
         station.start()
