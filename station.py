@@ -111,6 +111,7 @@ class Station:
         # --------RS-------- #
 
         #if station has only one ip
+        '''Need to handle case where 2 ips are associated with a station'''
         self.station_name = list(self.station_info.keys())[0]
 
         self.my_username = self.station_info[self.station_name]['ip']
