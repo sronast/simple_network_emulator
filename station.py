@@ -80,14 +80,12 @@ class Station:
         
         '''
         Station info
-            {
-                "D": {
-                    "ip":"128.252.13.67",
-                    "mask":"255.255.255.224",
-                    "mac":"00:00:0C:04:52:67",
-                    "lan":"cs3"
-                }
-            }
+                {
+                "stations":["R3-cs1","R3-cs2"],
+                "R3-cs1": {"ip":"128.252.11.49","mask":"255.255.255.0",
+                            "mac":"08:40:20:75:41:85","lan":"cs1"},
+                "R3-cs2": {"ip":"128.252.13.45","mask":"255.255.255.224","mac":"08:40:20:02:97:AB","lan":"cs2"}
+    }
         '''
         self.station_info = load_json_file(interface_file)
 
@@ -459,7 +457,7 @@ if __name__ == '__main__':
     routingtable_file = sys.argv[3]
     hostname_file = sys.argv[4]
 
-    is_router = input("Is this station a router? (y/n): ").lower() == 'y'
+    # is_router = input("Is this station a router? (y/n): ").lower() == 'y'
 
     if is_router:
         router = Router(ip_address, mac_address)
