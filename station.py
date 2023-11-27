@@ -126,7 +126,7 @@ class Station:
         self.all_connections = set()
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client_socket.settimeout(2)
-        self.hostname_mapping = {}
+        # self.hostname_mapping = {}
         self.connected_lans = {}
 
         # self.lan_name = self.station_info[station]["lan"]
@@ -214,6 +214,7 @@ class Station:
     def connect_to_lans(self):
         ####### RS ######
         print('in connect to lans')
+        print(self.station_info["stations"])
         for interface in self.station_info["stations"]:
             bridge_name = self.station_info[interface]["lan"]
             #check if there is an active lan with lan_name
@@ -226,35 +227,36 @@ class Station:
             bridge_port = lan_info['port']
             print('all info gathered')
             print(f'Bridge ip: {bridge_ip} Bridge port: {bridge_port}')
+
             try:
                     # Initialize a TCP socket connection to the bridge
-                    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                        # self.set_socket_nonblocking(s)
-
-                        response = s.connect((bridge_ip, int(bridge_port)))
-                        print('Connected to bridge ----------')
-                        retries = 5
-                        wait_time = 2  # seconds
-                        for _ in range(retries):
-                            ready_to_read, _, _ = select.select([s], [], [], wait_time)
-                            if ready_to_read:
-                                response = s.recv(HEADER_LENGTH)
-                                response = pickle.loads(response)
-                                if response['message'] == 'accept':
-                                    self.connected_lans[interface] = s
-                                    print(f"Connected to {bridge_name} on interface {interface}")
-                                    break
-                                else:
-                                    print(f"Connection to {bridge_name} on interface {interface} rejected")
-                                    break
-                            else:
-                                print(f"Retrying connection to {bridge_name} on interface {interface}")
-                        else:
-                            print(f"Failed to connect to {bridge_name} on interface {interface}")
-                        print(f'Sleep for 60 sec........')
-                        time.sleep(60)
+                # self.set_socket_nonblocking(s)
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                retries = 5
+                wait_time = 2  # seconds
+                print('In for')
+                for _ in range(retries):
+                    sock.connect((bridge_ip, int(bridge_port)))
+                    print('fasd')
+                    response = sock.recv(HEADER_LENGTH)
+                    response = pickle.loads(response)
+                    if response['message'] == 'accept':
+                        self.connected_lans[interface] = sock
+                        print(f"Connected to {bridge_name} on interface {interface}")
+                        self.all_connections.add(sock)
+                        break
+                    elif response['message'] == 'reject':
+                        print('The connection cannot be established')
+                        sys.exit(0)
+                    else:
+                        print(f"Connection to {bridge_name} on interface {interface} rejected..\nRetrying...")
+                    time.sleep(wait_time)
+                    
+                    # ready_to_read, _, _ = select.select([s], [], [], wait_time)
+                        
             except Exception as e:
                 print(f"Error connecting to {bridge_name}: {e}")
+                sys.exit(0)
         ########### RS #######
 
         # for interface, bridge_info in self.interface_info.items():
@@ -287,6 +289,7 @@ class Station:
         #             print(f"Error connecting to {bridge_name}: {e}")
 
     def send_messages(self, client_socket):
+        print('In send message')
         while True:
             try:
                 # Wait for the user to input a message
@@ -370,6 +373,7 @@ class Station:
 
     def receive_frame(self):
         try:
+            print('In recv frame')
             message = self.client_socket.recv(self.LENGTH)
             frame = pickle.loads(message)
             self.process_frame(frame)
@@ -389,21 +393,77 @@ class Station:
     def start(self):
         try:
             #try connecting to lans 
-            res = self.connect_to_lans()
-            print('Connected to lans')
-
-            self.client_socket.connect((self.HOST, 5000))
-            self.all_connections.add(self.client_socket)
-            print('Connected to the bridge!')
-            threading.Thread(target=self.send_messages, args=(self.client_socket,)).start()
-
+            self.connect_to_lans()
+            # sys.exit(0)
+            # threading.Thread(target=self.send_messages, args=(self.client_socket,)).start()
+            self.possible_inputs=[sys.stdin]+list(self.all_connections)
+            # print(self.possible_inputs)
+            print('Before while')
+            print(f'Enter the message in format: destination_name;message')
             while True:
-                read_sockets, _, _ = select.select(list(self.all_connections), [], [])
+                # print('In while')
+                # destination = input('Enter the destination: ')
+                # print('Enter message to send')
+
+                read_sockets,_, _ = select.select(self.possible_inputs,[],[])
+                print('Read socks')
+                print(read_sockets)
                 for sock in read_sockets:
-                    if sock == self.client_socket:
-                        self.receive_frame()
+                    #if client receives message from the server
+                    if sock == list(self.all_connections)[0]:
+                        message = list(self.all_connections)[0].recv(self.LENGTH)
+                        print(message)
+                        if message:
+                            message = pickle.loads(message)
+                            print('Message from the server')
+                            print(message)
+                        #if message is empty, the server has died
+                        else:
+                            print(f'>>>The server died<<<')
+                            self.is_connected = False
+                    #if client needs to send message to the server
                     else:
-                        print('Unknown socket:', sock)
+                        
+                        destination, message = str(sys.stdin.readline()).split(';')
+                        print(f'dest: {destination}, message: {message}')
+                        
+                        if destination == self.station_name:
+                            print('Cannot send message to itself...')
+                            continue
+
+                        if destination not in self.hostname_mapping:
+
+                            print('Destination not found....')
+                            continue
+
+
+                        ip_packet = {
+                            'source_ip':self.ip_address,
+                            'destination_ip': self.hostname_mapping[destination], 
+                            'message': message
+                        }
+                        destination_mac = None
+
+                        frame = {
+                            'source_mac': self.mac_address,
+                            'destination_mac':None,
+                            'ip_packet': ip_packet
+                        }
+                        print('Sending message from client............')
+                        list(self.all_connections)[0].send(pickle.dumps(frame))
+
+                # ####
+                # print('In while')
+                # read_sockets, _, _ = select.select(list(self.all_connections), [], [])
+                # print('Read scoks')
+                # print(read_sockets)
+                # for sock in read_sockets:
+                #     print(sock)
+                #     if sock == self.client_socket:
+                #         self.send_messages(self.client_socket)
+                #         self.receive_frame()
+                #     else:
+                #         print('Unknown socket:', sock)
         except ConnectionRefusedError:
             print("Connection to the bridge refused. Exiting...")
         finally:
@@ -413,14 +473,16 @@ class Station:
         self.client_socket.close()
 
 class Router(Station):
-    def __init__(self, ip_address, mac_address):
-        super().__init__(ip_address, mac_address)
+    def __init__(self, inerface_file, routingtable_file, hostname_file):
+        super().__init__(inerface_file, routingtable_file, hostname_file)
         self.connected_bridges = {}
-        self.host_name = load_from_json_file('hostname.json')
-        self.routing_table = load_from_json_file('routingtable.json')
-        self.interface_info = load_from_json_file('interface.json')
+        # self.host_name = load_from_json_file('hostname.json')
+        # self.routing_table = load_from_json_file('routingtable.json')
+        # self.interface_info = load_from_json_file('interface.json')
 
     def connect_to_bridges(self):
+        self.connect_to_lans()
+        return
         for interface, bridge_info in self.interface_info.items():
             bridge_name, bridge_port = bridge_info.split()
             ip_address = self.hostname_mapping.get(bridge_name)
@@ -471,14 +533,50 @@ class Router(Station):
         return None
 
     def main_loop(self):
-        threading.Thread(target=self.send_arp_requests).start()
+        
+        try:
+            self.connect_to_lans()
+            while True:
+                # print('In while')
+                # destination = input('Enter the destination: ')
+                # print('Enter message to send')
+
+                read_sockets,_, _ = select.select(list(self.all_connections),[],[])
+                print('Read socks')
+                print(read_sockets)
+                for sock in read_sockets:
+                    #if client receives message from the server
+                    if sock == list(self.all_connections)[0]:
+                        message = list(self.all_connections)[0].recv(self.LENGTH)
+                        if message:
+                            message = pickle.loads(message)
+                            print('Message from the server')
+                            print(message)
+                        #if message is empty, the server has died
+                        else:
+                            print(f'>>>The server died<<<')
+                            self.is_connected = False
+                    #if client needs to send message to the server
+                    elif sock == list(self.all_connections)[1]:
+                        message = list(self.all_connections)[1].recv(self.LENGTH)
+                        if message:
+                            message = pickle.loads(message)
+                            print('Message from the server')
+                            print(message)
+                        #if message is empty, the server has died
+                        else:
+                            print(f'>>>The server died<<<')
+                            self.is_connected = False 
+        except ConnectionRefusedError:
+            print("Connection to the bridge refused. Exiting...")
+        finally:
+            pass
+            # self.client_socket.close()
+
+
+        ############
 
         while True:
-            # Simulate user input
-            user_input = input("Enter message: ")
-            destination_ip = input("Enter destination IP: ")
-            self.forward_packet(destination_ip, user_input)
-
             # Simulate receiving frames
             time.sleep(1)
             self.receive_frame()
@@ -514,11 +612,10 @@ if __name__ == '__main__':
     # is_router = input("Is this station a router? (y/n): ").lower() == 'y'
 
     if is_router:
-        pass
-        # router = Router(ip_address, mac_address)
+        router = Router(inerface_file, routingtable_file, hostname_file)
         # router.connect_to_bridges()
-        # router.start()
-        # router.close()
+        router.main_loop()
+        router.close()
     else:
         station = Station(inerface_file, routingtable_file, hostname_file)
         station.start()

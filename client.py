@@ -24,8 +24,10 @@ class Client:
     def monitor_message(self):
         try:
             while self.is_connected:
+                print(self.client_socket)
                 read_sockets,write_socket, error_socket = select.select(self.possible_inputs,[],[])
-    
+                print('Read socks')
+                print(read_sockets)
                 for sock in read_sockets:
                     #if client receives message from the server
                     if sock == self.client_socket:

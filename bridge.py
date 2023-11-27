@@ -39,12 +39,14 @@ class Bridge:
 
     #send incoming message to all the clients, but not to the one sending the message and the server
     def broadcast(self, frame, source_mac):
+        print('In broadcast')
         source_port = self.bridge_table[source_mac]
         #get connection associated with the port
         source = self.port_to_station_ip[source_port]
         for client in self.all_connections1.copy():
             if client not in [source, self.server_socket]:
                 try:
+                    print(client)
                     client.send(frame)
                 except:
                     client.close()
@@ -106,20 +108,25 @@ class Bridge:
                             self.port_to_station_ip[random_port_of_bridge] = connection
                             self.reverse_bridge_table[random_port_of_bridge] = None
                             status = 'accept'
-                            print(f'Client: {address[0]}:{address[1]} connected at port {random_port_of_bridge}')
+                            # print(f'Client: {address[0]}:{address[1]} connected at port {random_port_of_bridge}')
                         # self.broadcast(connection, f'>>>New client {address[0]}({address[1]}) connected<<<')
                         #no port available in the bridge
                         else:
                             status = 'reject'
                         
+                    
+                        # print('Sending response to the clent.....')
+                        # print(status)
                         connection.send(pickle.dumps({'message': status, 'type': 'connection_establishment'}))
 
                     else:
+                        print('In else...........client has sent message')
                         hostname,port=sock.getpeername()
                         #which port is receiving the message
                         port_of_bridge =  self.station_ip_to_port[f'{hostname}:{port}']
                         try:
                             #message is a frame which contains source and destination mac addresses
+                            print('In try')
                             message = sock.recv(self.LENGTH)
                             frame = pickle.loads(message)
                             print('Message from client')
@@ -130,17 +137,15 @@ class Bridge:
                             #bridge receives the frame
                             else:
                                 print('In else')
-                                source_mac = frame.source_mac
-                                destination_mac = frame.destination_mac
+                                print('Received frame from a station....')
+                                source_mac = frame['source_mac']
+                                destination_mac = frame['destination_mac']
 
                                 #self learning:: addin sender's mac to the bridge table if not already exists
                                 if source_mac not in self.bridge_table:
                                     self.bridge_table[source_mac] = port_of_bridge
                                     self.reverse_bridge_table[port_of_bridge] = source_mac
-# <<<<<<< rs
-                                
-# =======
-# >>>>>>> main
+#
                                 #check if destination mac is in the bridge table
                                 #true pass the frame to that station
                                 if destination_mac in self.bridge_table:
