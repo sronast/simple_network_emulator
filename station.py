@@ -402,9 +402,12 @@ class Router(Station):
                 self.encapsulate_ip_packet(pending_ip_packet['destination_ip'], pending_ip_packet['message'])
 
 if __name__ == '__main__':
-    assert len(sys.argv) == 3, 'Usage: python station.py ip_address mac_address'
-    ip_address = sys.argv[1]
-    mac_address = sys.argv[2]
+    assert len(sys.argv) == 4, 'Usage: python -no/route station.py interface routingtable hostname'
+    is_router = sys.argv[1] == "-route"
+
+    inerface_file = sys.argv[2]
+    routingtable_file = sys.argv[3]
+    hostname_file = sys.argv[4]
 
     is_router = input("Is this station a router? (y/n): ").lower() == 'y'
 
@@ -414,6 +417,6 @@ if __name__ == '__main__':
         router.start()
         router.close()
     else:
-        station = Station(ip_address, mac_address)
+        station = Station(inerface_file, routingtable_file)
         station.start()
         station.close()
