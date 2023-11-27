@@ -56,13 +56,15 @@ def load_from_json_file(file_name):
 
     return all_data
 
-def load_hostname(file_path):
+def load_json_file(file_path):
     try:
         with open(file_path, 'r') as f:
-            hostnames = json.load(f)
+            hashmap = json.load(f)
         
     except FileNotFoundError:
-        pass
+        hashmap  ={}
+
+    return hashmap
 
 
 def load_hostname_file(self, file_path):
@@ -86,3 +88,9 @@ def load_interface_file(self, file_path):
 def save_to_json(file_name, hashmap):
     with open(file_name, 'w') as f:
         json.dump(hashmap, f)
+
+if __name__ == '__main__':
+    # hashmap = load_json_file('rtables/rtable_a.json')
+    hashmap = load_json_file('ifaces/ifaces_e.json')
+    print(hashmap)
+    print(list(hashmap.keys())[0])

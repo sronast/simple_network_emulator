@@ -63,10 +63,59 @@ def create_arp_request(sender_ip, sender_mac, target_ip):
     return pickle.dumps(arp_request)
 
 class Station:
-    def __init__(self, ip_address, mac_address):
-        self.my_username = ip_address
-        self.ip_address = ip_address
-        self.mac_address = mac_address
+    def __init__(self, interface_file, routingtable_file, hostname_file):
+
+        ##RS##
+
+        '''
+        Hostname mapping
+        {
+             "A": "128.252.11.23",
+             "Acs1": "128.252.11.23",
+             "D": "128.252.13.67",
+        }
+        '''
+        self.hostname_mapping = load_json_file(hostname_file)
+        ###########
+        
+        '''
+        Station info
+            {
+                "D": {
+                    "ip":"128.252.13.67",
+                    "mask":"255.255.255.224",
+                    "mac":"00:00:0C:04:52:67",
+                    "lan":"cs3"
+                }
+            }
+        '''
+        self.station_info = load_json_file(interface_file)
+
+        '''
+        -----Routing table----
+        #key is the destination network prefix
+        {
+            "128.252.11.0":{
+                            "next_hop":"0.0.0.0",
+                            "mask":"255.255.255.0",
+                            "next_interface":"R1-cs1"
+                            },
+            "128.252.13.32":{"next_hop":"0.0.0.0","mask":"255.255.255.224","next_interface":"R1-cs2"},
+            "128.252.13.64":{"next_hop":"128.252.13.38","mask":"255.255.255.224","next_interface":"R1-cs2"}
+}
+        
+        '''    
+
+
+        self.routing_table = load_json_file(routingtable_file)
+        # --------RS-------- #
+
+        #if station has only one ip
+        self.station_name = list(self.station_info.keys())[0]
+
+        self.my_username = self.station_info[self.station_name]['ip']
+        self.ip_address = self.station_info[self.station_name]['ip']
+        self.mac_address = self.station_info[self.station_name]['mac']
         self.pending_queue = Queue()
         self.arp_table = ARPCache()
         self.forwarding_table = RoutingTable()
@@ -417,6 +466,6 @@ if __name__ == '__main__':
         router.start()
         router.close()
     else:
-        station = Station(inerface_file, routingtable_file)
+        station = Station(inerface_file, routingtable_file, hostname_file)
         station.start()
         station.close()
