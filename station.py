@@ -213,6 +213,7 @@ class Station:
 
     def connect_to_lans(self):
         ####### RS ######
+        print('in connect to lans')
         for interface in self.station_info["stations"]:
             bridge_name = self.station_info[interface]["lan"]
             #check if there is an active lan with lan_name
@@ -223,19 +224,23 @@ class Station:
             lan_info = load_json_file(f'bridge_{bridge_name}.json')
             bridge_ip = lan_info['ip']
             bridge_port = lan_info['port']
-
+            print('all info gathered')
+            print(f'Bridge ip: {bridge_ip} Bridge port: {bridge_port}')
             try:
                     # Initialize a TCP socket connection to the bridge
                     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                        self.set_socket_nonblocking(s)
-                        s.connect((bridge_ip, int(bridge_port)))
+                        # self.set_socket_nonblocking(s)
+
+                        response = s.connect((bridge_ip, int(bridge_port)))
+                        print('Connected to bridge ----------')
                         retries = 5
                         wait_time = 2  # seconds
                         for _ in range(retries):
                             ready_to_read, _, _ = select.select([s], [], [], wait_time)
                             if ready_to_read:
-                                response = s.recv(HEADER_LENGTH).decode('utf-8')
-                                if response == 'accept':
+                                response = s.recv(HEADER_LENGTH)
+                                response = pickle.loads(response)
+                                if response['message'] == 'accept':
                                     self.connected_lans[interface] = s
                                     print(f"Connected to {bridge_name} on interface {interface}")
                                     break
@@ -246,6 +251,8 @@ class Station:
                                 print(f"Retrying connection to {bridge_name} on interface {interface}")
                         else:
                             print(f"Failed to connect to {bridge_name} on interface {interface}")
+                        print(f'Sleep for 60 sec........')
+                        time.sleep(60)
             except Exception as e:
                 print(f"Error connecting to {bridge_name}: {e}")
         ########### RS #######
@@ -381,6 +388,10 @@ class Station:
 
     def start(self):
         try:
+            #try connecting to lans 
+            res = self.connect_to_lans()
+            print('Connected to lans')
+
             self.client_socket.connect((self.HOST, 5000))
             self.all_connections.add(self.client_socket)
             print('Connected to the bridge!')
@@ -500,7 +511,7 @@ if __name__ == '__main__':
     routingtable_file = sys.argv[3]
     hostname_file = sys.argv[4]
 
-    is_router = input("Is this station a router? (y/n): ").lower() == 'y'
+    # is_router = input("Is this station a router? (y/n): ").lower() == 'y'
 
     if is_router:
         pass
