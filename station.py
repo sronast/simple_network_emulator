@@ -1,6 +1,7 @@
 import os
 import json
-import fcntl
+# import fcntl
+import portalocker
 import errno
 import sys
 import socket
@@ -206,10 +207,15 @@ class Station:
         # Enqueue the IP packet for which ARP resolution is pending
         self.pending_queue.put({'destination_ip': destination_ip, 'message': message})
         
+    # def set_socket_nonblocking(self, sock):
+    #     # Set the socket to non-blocking mode
+    #     flags = fcntl.fcntl(sock, fcntl.F_GETFL)
+    #     fcntl.fcntl(sock, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+
     def set_socket_nonblocking(self, sock):
         # Set the socket to non-blocking mode
-        flags = fcntl.fcntl(sock, fcntl.F_GETFL)
-        fcntl.fcntl(sock, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+        flags = portalocker.LOCK_NB
+        portalocker.lock(sock, flags)
 
     def connect_to_lans(self):
         ####### RS ######
