@@ -18,18 +18,14 @@ class Station:
         self.reverse_hostname_mapping = {v:k for k, v in self.hostname_mapping.items()}
         self.station_info = load_json_file(interface_file)
         self.routing_table = load_json_file(routingtable_file)
-        # --------RS-------- #
         self.arp_table = {}
         self.pending_queue = deque()
-        
         self.LENGTH = 4096
         self.all_connections = set()
         self.socket_to_ip = {}
         self.ip_to_socket = {}
 
-
     def connect_to_lans(self):
-        ####### RS ######
         print(self.station_info["stations"])
         for interface in self.station_info["stations"]:
             bridge_name = self.station_info[interface]["lan"]
@@ -44,7 +40,6 @@ class Station:
             bridge_port = lan_info['port']
             print('all info gathered')
             print(f'Bridge ip: {bridge_ip} Bridge port: {bridge_port}')
-
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 retries = 5
@@ -97,7 +92,6 @@ class Station:
             print(f'IP \t MAC')
             for k,v in self.arp_table.items():
                 print(f'{k} \t {v}')
-
             ## implement here 
             print('============ END ===========')
         else:
@@ -133,7 +127,6 @@ class Station:
     def forward_message(self, messsage, sock):
         sock.send(pickle.dumps(messsage))
 
-
     def prepare_message(self, destination, message):
         destination_ip = self.hostname_mapping[destination]
         destination_mac = self.arp_table.get(destination_ip, None)
@@ -168,7 +161,6 @@ class Station:
                 return entry['next_interface']
         return False, False
 
-
     def process_arp(self, message, sock):
         destination_ip = message['destination_ip']
         source_ip = message['source_ip']
@@ -193,24 +185,18 @@ class Station:
                     interface_ip = self.hostname_mapping[next_interface]
                     interface_socket = self.ip_to_socket[interface_ip]
                     self.send_arp(message, interface_socket)
-                
-
             elif my_ip == destination_ip:
                 print("Received ARP request...processing")
                 my_mac = self.station_info[my_name]['mac']
                 # sock = self.ip_to_socket[my_ip]
                 self.send_arp({'source_ip':my_ip ,'destination_ip': source_ip, 'source_mac': my_mac, 'destination_mac':message['source_mac'], 'type':'ARP_response'}, sock)
-
             else:
                 print("Received ARP request destined for different station...dropping.....")
         
         elif message['type'] == 'ARP_response':
-
-            
             if self.is_router:
                 print('Received ARP response in router')
                 #forward the packet to necesary hop/drop
-
                 next_interface = self.get_next_interface(destination_ip)
                 #if yes drop the packet
                 if next_interface == my_name:
@@ -221,8 +207,6 @@ class Station:
                     interface_ip = self.hostname_mapping[next_interface]
                     interface_socket = self.ip_to_socket[interface_ip]
                     self.send_arp(message, interface_socket)
-
-
             elif my_ip == destination_ip:
                 print("Received ARP response...Processing pending queue..")
                 self.process_pending_queue()
@@ -233,15 +217,11 @@ class Station:
         socket_ip, socket_port = sock.getpeername()
         my_ip = self.socket_to_ip[f'{socket_ip}:{socket_port}']
         my_name =  self.reverse_hostname_mapping[my_ip]
-
-        # print('process frame message....')
-        # print(message)
-
         ip_packet = message['ip_packet']
         destination_ip = ip_packet['destination_ip']
         if self.is_router:
             next_interface = self.get_next_interface(destination_ip)
-                #if yes drop the packet
+            #if yes drop the packet
             if next_interface == my_name:
                 print('Received IP Packet in a router....The destination host is in  the same network...Dropping...')
             #else retrun the mac address of the router as arp reply
@@ -250,7 +230,6 @@ class Station:
                 interface_ip = self.hostname_mapping[next_interface]
                 interface_socket = self.ip_to_socket[interface_ip]
                 self.forward_message(message, interface_socket)
-
         else:
             if self.station_info[my_name]['mac'] == message['destination_mac']:
                 ip_packet = message['ip_packet']
@@ -261,35 +240,31 @@ class Station:
     
     def receive_message(self, message, sock):
         message = pickle.loads(message)
-
         if message['type'] in {'ARP_request', 'ARP_response'}:
             self.process_arp(message, sock)
-
         elif message['type'] == 'IP':
             self.process_frame(message, sock)
 
     def handle_input(self):
-        usr_input = sys.stdin.readline()
-        if ';' not in usr_input:
-            print('Wrong input format...')
-            return
-        
-        destination, message = usr_input.split(';')
+        # usr_input = sys.stdin.readline()
+        # if ';' not in usr_input:
+        #     print('Wrong input format...')
+        #     return
+        # destination, message = usr_input.split(';')
+        # print(f'dest: {destination}, message: {message}')
+
+        destination = input("Enter the Destination or any command: ")
+        message = input("Enter the Message or any command: ")
         destination, message = destination.strip(), message.strip()
-        print(f'dest: {destination}, message: {message}')
 
         if self.is_router and destination != 'print':
             print('Router only supports commands....')
-
         elif destination.lower() == 'print':
             self.print_tables(message) 
-        
         elif destination == self.station_info["stations"][0]:
             print('Cannot send message to itself...')
-            
         elif destination not in self.hostname_mapping:
             print('Destination not found....')
-
         else:
             self.prepare_message(destination, message)
         
@@ -306,7 +281,6 @@ class Station:
         self.station_info['stations'].remove(station_name)
         bridge_name = self.station_info[station_name]['lan']
         self.station_info.pop(station_name, None)
-
         self.all_connections.remove(sock)
         return
 
@@ -353,7 +327,6 @@ class Station:
             for conn in self.all_connections.copy():
                 self.disconnect_from_lan(conn)
             print('Keyboard Interrupt... Station disconnected from all lans')
-
 
 if __name__ == '__main__':
     assert len(sys.argv) == 5, 'Usage: python station.py -no/route interface routingtable hostname'

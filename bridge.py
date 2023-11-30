@@ -93,8 +93,8 @@ class Bridge:
         # dest,command = str(usr_input).split(';')
         # dest,command = dest.strip(), command.strip()
 
-        dest = input("Input the Destination or any command: ")
-        command = input("Input the Message or any command: ")
+        dest = input("Enter the Destination or any command: ")
+        command = input("Enter the Message or any command: ")
 
         if dest.lower() == 'print':
             self.print_tables(command)
@@ -233,7 +233,6 @@ if __name__ == '__main__':
     #save json containing all bridges info
     save_to_json('all_lans.json', all_lans)
 
-    
     server = Bridge(lan_name, num_ports)
     server.start()
     server.close()
