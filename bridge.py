@@ -2,10 +2,8 @@ import sys
 import os
 import json
 import pickle
-#####
 import socket
 import select
-###
 from utils import *
 
 class Bridge:

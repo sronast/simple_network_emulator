@@ -4,8 +4,6 @@ import threading
 import select
 import signal
 import pickle
-
-#
 from frame import Frame
 
 class Client:
