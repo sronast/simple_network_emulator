@@ -1,6 +1,5 @@
 import os
 import json
-# import fcntl
 import portalocker
 import errno
 import sys
@@ -11,57 +10,6 @@ import ipaddress
 import time
 from collections import deque
 from utils import *
-
-HEADER_LENGTH = 1024
-
-# class ARPPacket:
-#     def __init__(self, operation, sender_ip, sender_mac, target_ip, target_mac=None):
-#         self.operation = operation
-#         self.sender_ip = sender_ip
-#         self.sender_mac = sender_mac
-#         self.target_ip = target_ip
-#         self.target_mac = target_mac
-
-# # ARPCache class
-# class ARPCache:
-#     def __init__(self):
-#         self.cache = {}
-
-#     def add_mapping(self, ip_address, mac_address):
-#         self.cache[ip_address] = mac_address
-
-#     def get_mac_address(self, ip_address):
-#         return self.cache.get(ip_address, None)
-
-# # RoutingTable class
-# class RoutingTable:
-#     def __init__(self):
-#         self.table = {}
-
-#     def add_entry(self, destination, next_hop):
-#         self.table[destination] = next_hop
-
-#     def get_next_hop(self, destination):
-#         return self.table.get(destination, None)
-
-# # Function to create a data frame
-# def create_frame(source_mac, destination_mac, message):
-#     frame = {
-#         'source_mac': source_mac,
-#         'destination_mac': destination_mac,
-#         'message': message,
-#     }
-#     return pickle.dumps(frame)
-
-# # Function to create an ARP request
-# def create_arp_request(sender_ip, sender_mac, target_ip):
-#     arp_request = {
-#         'type': 'request',
-#         'sender_ip': sender_ip,
-#         'sender_mac': sender_mac,
-#         'target_ip': target_ip,
-#     }
-#     return pickle.dumps(arp_request)
 
 class Station:
     def __init__(self, interface_file, routingtable_file, hostname_file, is_router=True):
@@ -103,7 +51,7 @@ class Station:
                 wait_time = 2  # seconds
                 for _ in range(retries):
                     sock.connect((bridge_ip, int(bridge_port)))
-                    response = sock.recv(HEADER_LENGTH)
+                    response = sock.recv(self.LENGTH)
                     response = pickle.loads(response)
                     if response['message'] == 'accept':
                         print(f"Connected to {bridge_name} on interface {interface}.........")

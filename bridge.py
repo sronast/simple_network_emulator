@@ -182,7 +182,6 @@ class Bridge:
                                 if source_mac not in self.bridge_table:
                                     self.bridge_table[source_mac] = port_of_bridge
                                     self.reverse_bridge_table[port_of_bridge] = source_mac
-#
                                 #check if destination mac is in the bridge table
                                 #true pass the frame to that station
                                 if destination_mac in self.bridge_table:
