@@ -30,7 +30,7 @@ class Bridge:
         self.available_ports = set(list(range(self.num_ports)))
 
     def unicast(self, frame, destination_mac):
-        print('bridge   table')
+        print('Bridge Table')
         print(self.bridge_table)
         destination_port = self.bridge_table[destination_mac]
         
@@ -40,7 +40,6 @@ class Bridge:
 
     #send incoming message to all the clients, but not to the one sending the message and the server
     def broadcast(self, frame, source_mac):
-        print('In broadcast')
         source_port = self.bridge_table[source_mac]
         #get connection associated with the port
         source = self.port_to_station_ip[source_port]
@@ -87,12 +86,16 @@ class Bridge:
         return
     
     def handle_input(self):
-        usr_input = sys.stdin.readline()
-        if ';' not in usr_input:
-            print('Wrong input format...')
-            return
-        dest,command = str(usr_input).split(';')
-        dest,command = dest.strip(), command.strip()
+        # usr_input = sys.stdin.readline()
+        # if ';' not in usr_input:
+        #     print('Wrong input format...')
+        #     return
+        # dest,command = str(usr_input).split(';')
+        # dest,command = dest.strip(), command.strip()
+
+        dest = input("Input the Destination or any command: ")
+        command = input("Input the Message or any command: ")
+
         if dest.lower() == 'print':
             self.print_tables(command)
         else:
@@ -142,13 +145,11 @@ class Bridge:
                         self.handle_input()
                     
                     else:
-                        print('In else...........client has sent message')
                         hostname,port = sock.getpeername()
                         #which port is receiving the message
                         port_of_bridge =  self.station_ip_to_port[f'{hostname}:{port}']
                         try:
                             #message is a frame which contains source and destination mac addresses
-                            print('In try')
                             try:
                                 retries = 5
                                 wait_time = 2 
@@ -173,7 +174,6 @@ class Bridge:
                                 continue
                             #bridge receives the frame
                             else:
-                                print('In else')
                                 print('Received frame from a station....')
                                 source_mac = frame['source_mac']
                                 destination_mac = frame['destination_mac']
@@ -196,8 +196,8 @@ class Bridge:
                                     self.broadcast(message, source_mac)
                                     print('...........Broadcast')
                                     
-                            print('available prots: ', self.available_ports)   
-                            print('used ports: ', self.used_ports)   
+                            print('Available prots: ', self.available_ports)   
+                            print('Used ports: ', self.used_ports)   
                         except:
                             print('In except')
                             self.free_bridge_port(port_of_bridge, sock)
