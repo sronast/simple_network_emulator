@@ -381,7 +381,17 @@ class Station:
                         for conn in self.all_connections.copy():
                         #if client receives message from the server
                             if sock == conn:
-                                message = conn.recv(self.LENGTH)
+                                try:
+                                    retries = 5
+                                    wait_time = 2 
+                                    for _ in range(retries):
+                                        message = conn.recv(self.LENGTH)
+                                        if message:
+                                            break
+                                        else:
+                                            time.sleep(wait_time)
+                                except socket.timeout:
+                                    pass
                                 if message:
                                     self.receive_message(message, sock)
                                 #if message is empty, the server has died

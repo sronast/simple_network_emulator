@@ -4,6 +4,7 @@ import json
 import pickle
 import socket
 import select
+import time
 from utils import *
 
 class Bridge:
@@ -53,7 +54,7 @@ class Bridge:
     
     #if a station/router gets disconnected
     def free_bridge_port(self, port_of_bridge, sock):
-        hostname,port=sock.getpeername()
+        hostname,port = sock.getpeername()
         print(self.station_ip_to_port)
         self.station_ip_to_port.pop(f'{hostname}:{port}')
         self.port_to_station_ip.pop(port_of_bridge)
@@ -142,13 +143,23 @@ class Bridge:
                     
                     else:
                         print('In else...........client has sent message')
-                        hostname,port=sock.getpeername()
+                        hostname,port = sock.getpeername()
                         #which port is receiving the message
                         port_of_bridge =  self.station_ip_to_port[f'{hostname}:{port}']
                         try:
                             #message is a frame which contains source and destination mac addresses
                             print('In try')
-                            message = sock.recv(self.LENGTH)
+                            try:
+                                retries = 5
+                                wait_time = 2 
+                                for _ in range(retries):
+                                    message = sock.recv(self.LENGTH)
+                                    if message:
+                                        break
+                                    else:
+                                        time.sleep(wait_time)
+                            except socket.timeout:
+                                pass
                             if not message:
                                 self.free_bridge_port(port_of_bridge, sock)
                                 continue
