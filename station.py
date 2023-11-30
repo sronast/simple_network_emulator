@@ -1,6 +1,7 @@
 import os
 import json
-import fcntl
+# import fcntl
+import portalocker
 import errno
 import sys
 import socket
