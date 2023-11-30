@@ -31,6 +31,8 @@ class Bridge:
         self.available_ports = set(list(range(self.num_ports)))
 
     def unicast(self, frame, destination_mac):
+        print('bridge   table')
+        print(self.bridge_table)
         destination_port = self.bridge_table[destination_mac]
         
         #get tcp connection asssociated with the port
@@ -46,7 +48,6 @@ class Bridge:
         for client in self.all_connections1.copy():
             if client not in [source, self.server_socket]:
                 try:
-                    print(client)
                     client.send(frame)
                 except:
                     client.close()
@@ -59,7 +60,6 @@ class Bridge:
         self.station_ip_to_port.pop(f'{hostname}:{port}')
         self.port_to_station_ip.pop(port_of_bridge)
         #free the port
-        print('no msg from client')
         self.available_ports.add(port_of_bridge)
         self.used_ports-=1
         #get mac of the station if there is in the bridge table
@@ -67,15 +67,37 @@ class Bridge:
         self.reverse_bridge_table.pop(port_of_bridge, None)
         #remove the mapping form the bridge table if exists
         self.bridge_table.pop(f'{mac_of_station}', None)
-
         # print(f'>>>{hostname} at port ({port_of_bridge}) disconnected!!!!')
         self.all_connections1.remove(sock)
+
+        print(f'Station at port {port_of_bridge} disconnected.....')
         print('Remaining conns: ', self.all_connections1)
         print(self.station_ip_to_port)
         print(f'Available ports = {self.available_ports}')
 
         # self.broadcast(sock, f'>>>{hostname}({port}) disconnected!!!!')
         sock.close()
+
+    def print_tables(self, message):
+        if message == 'bt':
+            print(f'\tMAC\t\tPort')
+            for k,v in self.bridge_table.items():
+                print(f'{k}\t\t{v}')
+        else:
+            print(f'Command {message} not found')
+        return
+    
+    def handle_input(self):
+        usr_input = sys.stdin.readline()
+        if ';' not in usr_input:
+            print('Wrong input format...')
+            return
+        dest,command = str(usr_input).split(';')
+        dest,command = dest.strip(), command.strip()
+        if dest.lower() == 'print':
+            self.print_tables(command)
+        else:
+            print('Bridge only accepts command...')
 
     def start(self):
         print('Server started!! ')
@@ -91,7 +113,7 @@ class Bridge:
         #Waiting for connection set-up requests from stations / routers.
         try:
             while True:
-                read_sockets,write_socket, error_socket = select.select(list(self.all_connections1),[],[])
+                read_sockets,write_socket, error_socket = select.select(list(self.all_connections1)+[sys.stdin],[],[])
                 for sock in read_sockets:
                     #if server receives a new connection 
                     if sock == self.server_socket:
@@ -108,17 +130,18 @@ class Bridge:
                             self.port_to_station_ip[random_port_of_bridge] = connection
                             self.reverse_bridge_table[random_port_of_bridge] = None
                             status = 'accept'
-                            # print(f'Client: {address[0]}:{address[1]} connected at port {random_port_of_bridge}')
+                            print(f'Station connected at port {random_port_of_bridge}.......')
                         # self.broadcast(connection, f'>>>New client {address[0]}({address[1]}) connected<<<')
                         #no port available in the bridge
                         else:
                             status = 'reject'
-                        
-                    
                         # print('Sending response to the clent.....')
                         # print(status)
                         connection.send(pickle.dumps({'message': status, 'type': 'connection_establishment'}))
 
+                    elif sock == sys.stdin:
+                        self.handle_input()
+                    
                     else:
                         print('In else...........client has sent message')
                         hostname,port=sock.getpeername()
@@ -128,12 +151,17 @@ class Bridge:
                             #message is a frame which contains source and destination mac addresses
                             print('In try')
                             message = sock.recv(self.LENGTH)
+                            if not message:
+                                self.free_bridge_port(port_of_bridge, sock)
+                                continue
+
                             frame = pickle.loads(message)
                             print('Message from client')
                             print(frame)
                             #if router or station is disconnected
                             if not frame:
                                 self.free_bridge_port(port_of_bridge, sock)
+                                continue
                             #bridge receives the frame
                             else:
                                 print('In else')
@@ -149,6 +177,7 @@ class Bridge:
                                 #check if destination mac is in the bridge table
                                 #true pass the frame to that station
                                 if destination_mac in self.bridge_table:
+                                    print('...........Unicast:: ')
                                     #send the frame to the destination
                                     self.unicast(message, destination_mac)
                               
@@ -157,11 +186,8 @@ class Bridge:
                                 else:
                                     #if destination mac address not in the bridge table broadcast the frame
                                     self.broadcast(message, source_mac)
-# <<<<<<< rs
-
-                                
-# =======
-# >>>>>>> main
+                                    print('...........Broadcast')
+                                    
                             print('available prots: ', self.available_ports)   
                             print('used ports: ', self.used_ports)   
                         except:

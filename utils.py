@@ -24,7 +24,6 @@ def load_from_json(file_name):
     #no bridge
     else:
         all_lans = {}
-    
     return all_lans
 
 def load_from_json_file(file_name):
@@ -42,7 +41,6 @@ def load_from_json_file(file_name):
             elif 'routingtable' in file_name:
                 # Assuming space-separated values
                 data = [line.strip().split() for line in f]
-
                 # Create a list of dictionaries
                 all_data = [{'destination': row[0], 'next_hop': row[1], 'subnet_mask': row[2], 'interface': row[3]} for row in data]
 
