@@ -69,14 +69,14 @@ class Station:
 
     def print_tables(self, message):
         if message == 'rt':
-                print('============ Printing Routing Table ===========')
-                print('Network Address \t Next Hop Address \t Netmask \t Interface to next Hop')
-                for k,v in self.routing_table.items():
-                    res = '{}'.format(k)
-                    for kk, vv in v.items():
-                        res = res + '\t {}'.format(vv)
-                    print(res)
-                print('============ END ===========')
+            print('============ Printing Routing Table ===========')
+            print('Network Address \t Next Hop Address \t Netmask \t Interface to next Hop')
+            for k,v in self.routing_table.items():
+                res = '{}'.format(k)
+                for kk, vv in v.items():
+                    res = res + '\t {}'.format(vv)
+                print(res)
+            print('============ END ===========')
         elif message == 'dns':
             print('=========== Printing DNS Table ===============')
             
@@ -160,7 +160,7 @@ class Station:
                 self.send_message(source_ip, destination_ip, source_mac, destination_mac, message, sock)
             else:
                 self.pending_queue.append({'source_ip':source_ip ,'destination_ip': destination_ip, 'message':message, 'source_mac': source_mac, 'sock':sock})
-                #get mac of next hop router
+                # get mac of next hop router
                 self.send_arp({'source_ip':source_ip ,'destination_ip': next_hop_ip, 'source_mac': source_mac, 'destination_mac':'ff:ff:ff:ff:ff:ff', 'type':'ARP_request'}, sock)
     
     def process_pending_queue(self):
@@ -176,8 +176,7 @@ class Station:
                 destination_mac = self.arp_table.get(destination_ip, None)
             #destination in the different lan
             else:
-                destination_mac = self.arp_table.get(next_hop_ip,None)
-            
+                destination_mac = self.arp_table.get(next_hop_ip, None)
             if destination_mac:
                 self.send_message(item['source_ip'], item['destination_ip'], item['source_mac'], destination_mac, item['message'], next_interface_socket)
             else:
@@ -194,10 +193,17 @@ class Station:
         my_mac = self.station_info[my_name]['mac']
         # if message['source_ip'] not in self.arp_table:
         #     self.arp_table[message['source_ip']] = message['source_mac']
-        print("received {} at {}".format(message["type"], my_name))
+        # print("received {} at {}".format(message['type'], my_name))
         if message['type'] == 'ARP_request':
             if my_ip == destination_ip:
-                self.send_arp({'source_ip':my_ip ,'destination_ip': source_ip, 'source_mac': my_mac, 'destination_mac':message['source_mac'], 'type':'ARP_response'}, sock) 
+                arp_frame = {
+                    'source_ip': my_ip,
+                    'destination_ip': source_ip,
+                    'source_mac': my_mac,
+                    'destination_mac': message['source_mac'],
+                    'type': 'ARP_response'
+                }
+                self.send_arp(arp_frame, sock) 
             else:
                 print("Received ARP request destined for different station...dropping.....")
                 print(my_ip, destination_ip)
@@ -208,7 +214,7 @@ class Station:
                 self.process_pending_queue()
             else:
                 print("Received ARP response destined for different station.......")
-        print("Enter the Destination or any command: ", end="")
+        print("Enter the Destination or Type cmd for command: ", end="")
 
     def process_frame(self, message, sock):
         print("\n")
@@ -218,15 +224,13 @@ class Station:
         ip_packet = message['ip_packet']
         destination_ip = ip_packet['destination_ip']
         source_ip = ip_packet['source_ip']
-        print("Received {} at {}".format(message, my_name))
+        # print("Received {} at {}".format(message, my_name))
         if self.is_router:
-            print(self.ip_to_socket)
-            ########1 dec #######
+            # print(self.ip_to_socket)
             #if router received an ip packet then it must forward
             next_interface, next_hop_ip = self.get_next_interface(destination_ip)
             next_interface_ip = self.hostname_mapping[next_interface]
             next_interface_sock = self.ip_to_socket[next_interface_ip]
-
             #if the packet is destined for host in the next interface
             if next_hop_ip == '0.0.0.0':
                 print('Packet is destined for network in the next interface....')
@@ -236,9 +240,11 @@ class Station:
                 else:
                     print('Destination ip not in the arp table....')
                     #add the packet in the pending_queue
-                    self.pending_queue.append({'source_ip':source_ip ,'destination_ip': destination_ip, 'message':ip_packet['message'], 'source_mac': message['source_mac'], 'sock':next_interface_sock})
+                    self.pending_queue.append({'source_ip': source_ip, 'destination_ip': destination_ip, 
+                                               'message': ip_packet['message'], 'source_mac': message['source_mac'], 'sock': next_interface_sock})
                     #send arp request
-                    self.send_arp({'source_ip':next_interface_ip ,'destination_ip': destination_ip, 'source_mac': message['source_mac'], 'destination_mac':'ff:ff:ff:ff:ff:ff', 'type':'ARP_request'}, next_interface_sock)
+                    self.send_arp({'source_ip': next_interface_ip ,'destination_ip': destination_ip, 'source_mac': message['source_mac'], 
+                                   'destination_mac': 'ff:ff:ff:ff:ff:ff', 'type': 'ARP_request'}, next_interface_sock)
             #packet to be delivered in different lan
             else:
                 print('Packet for host in different lan')
@@ -248,9 +254,11 @@ class Station:
                     self.forward_message(message, next_interface_sock)
                 else:
                     #add the packet in the pending_queue
-                    self.pending_queue.append({'source_ip':source_ip ,'destination_ip': destination_ip, 'message':ip_packet['message'], 'source_mac': message['source_mac'], 'sock':next_interface_sock})
+                    self.pending_queue.append({'source_ip':source_ip ,'destination_ip': destination_ip, 'message': ip_packet['message'], 
+                                               'source_mac': message['source_mac'], 'sock':next_interface_sock})
                     #send arp request
-                    self.send_arp({'source_ip':next_interface_ip ,'destination_ip':next_hop_ip , 'source_mac': message['source_mac'], 'destination_mac':'ff:ff:ff:ff:ff:ff', 'type':'ARP_request'}, next_interface_sock)
+                    self.send_arp({'source_ip': next_interface_ip ,'destination_ip': next_hop_ip , 'source_mac': message['source_mac'], 
+                                   'destination_mac': 'ff:ff:ff:ff:ff:ff', 'type': 'ARP_request'}, next_interface_sock)
         else:
             if self.station_info[my_name]['mac'] == message['destination_mac']:
                 ip_packet = message['ip_packet']
@@ -258,7 +266,7 @@ class Station:
                 print('Message: {}'.format(ip_packet["message"]))
             else:
                 print('Received message destined for different station....dropping...')
-        print("Enter the Destination or any command: ", end="")
+        print("Enter the Destination or Type cmd for command: ", end="")
     
     def receive_message(self, message, sock):
         message = pickle.loads(message)
@@ -307,25 +315,25 @@ class Station:
     
     def listen_message(self, sock):
         for conn in self.all_connections.copy():
-            #if client receives message from the server
-                if sock == conn:
-                    try:
-                        retries = 5
-                        wait_time = 2 
-                        for _ in range(retries):
-                            message = conn.recv(self.LENGTH)
-                            if message:
-                                break
-                            else:
-                                time.sleep(wait_time)
-                    except socket.timeout:
-                        pass
-                    if message:
-                        self.receive_message(message, sock)
-                    #if message is empty, the server has died
-                    else:
-                        self.disconnect_from_lan(sock)
-                # break
+            # if client receives message from the server
+            if sock == conn:
+                try:
+                    retries = 5
+                    wait_time = 2 
+                    for _ in range(retries):
+                        message = conn.recv(self.LENGTH)
+                        if message:
+                            break
+                        else:
+                            time.sleep(wait_time)
+                except socket.timeout:
+                    pass
+                if message:
+                    self.receive_message(message, sock)
+                #if message is empty, the server has died
+                else:
+                    self.disconnect_from_lan(sock)
+            # break
 
     def start(self):
         try:
@@ -366,4 +374,3 @@ if __name__ == '__main__':
     # is_router = input("Is this station a router? (y/n): ").lower() == 'y'
     station = Station(inerface_file, routingtable_file, hostname_file, is_router)
     station.start()
-    
