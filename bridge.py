@@ -53,7 +53,7 @@ class Bridge:
     
     #if a station/router gets disconnected
     def free_bridge_port(self, port_of_bridge, sock):
-        hostname,port = sock.getpeername()
+        hostname, port = sock.getpeername()
         print(self.station_ip_to_port)
         self.station_ip_to_port.pop(f'{hostname}:{port}')
         self.port_to_station_ip.pop(port_of_bridge)
@@ -115,7 +115,7 @@ class Bridge:
         #Waiting for connection set-up requests from stations / routers.
         try:
             while True:
-                read_sockets,write_socket, error_socket = select.select(list(self.all_connections1)+[sys.stdin],[],[])
+                read_sockets, write_socket, error_socket = select.select(list(self.all_connections1)+[sys.stdin],[],[])
                 for sock in read_sockets:
                     #if server receives a new connection 
                     if sock == self.server_socket:
