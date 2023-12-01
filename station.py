@@ -8,6 +8,7 @@ import pickle
 import select
 import ipaddress
 import time
+import threading
 from collections import deque
 from utils import *
 
@@ -160,6 +161,7 @@ class Station:
         return False, False
 
     def process_arp(self, message, sock):
+        print("\n")
         destination_ip = message['destination_ip']
         source_ip = message['source_ip']
         socket_ip, socket_port = sock.getpeername()
@@ -210,8 +212,10 @@ class Station:
                 self.process_pending_queue()
             else:
                 print("Received ARP response destined for different station..updated ARP cache.....")
+        print("Enter the Destination or any command: ", end="")
 
     def process_frame(self, message, sock):
+        print("\n")
         socket_ip, socket_port = sock.getpeername()
         my_ip = self.socket_to_ip['{}:{}'.format(socket_ip, socket_port)]
         my_name =  self.reverse_hostname_mapping[my_ip]
@@ -235,6 +239,7 @@ class Station:
                 print('Message: {}'.format(ip_packet["message"]))
             else:
                 print('Received message destined for different station....dropping...')
+        print("Enter the Destination or any command: ", end="")
     
     def receive_message(self, message, sock):
         message = pickle.loads(message)
@@ -281,6 +286,28 @@ class Station:
         self.station_info.pop(station_name, None)
         self.all_connections.remove(sock)
         return
+    
+    def listen_message(self, sock):
+        for conn in self.all_connections.copy():
+            #if client receives message from the server
+                if sock == conn:
+                    try:
+                        retries = 5
+                        wait_time = 2 
+                        for _ in range(retries):
+                            message = conn.recv(self.LENGTH)
+                            if message:
+                                break
+                            else:
+                                time.sleep(wait_time)
+                    except socket.timeout:
+                        pass
+                    if message:
+                        self.receive_message(message, sock)
+                    #if message is empty, the server has died
+                    else:
+                        self.disconnect_from_lan(sock)
+                # break
 
     def start(self):
         try:
@@ -291,33 +318,17 @@ class Station:
                 if len(self.all_connections) == 0:
                     print('No active connections...')
                     break
-                self.possible_inputs=[sys.stdin]+list(self.all_connections)
-                read_sockets,_, _ = select.select(self.possible_inputs,[],[])
-                for sock in read_sockets:
+                # self.possible_inputs=[sys.stdin]+list(self.all_connections)
+                self.possible_inputs = list(self.all_connections)
+                # read_sockets,_, _ = select.select(self.possible_inputs,[],[])
+                # for sock in read_sockets:
+                for sock in self.possible_inputs:
                     #if client needs to send message to the server
-                    if sock == sys.stdin:
-                        self.handle_input()
-                    else:
-                        for conn in self.all_connections.copy():
-                        #if client receives message from the server
-                            if sock == conn:
-                                try:
-                                    retries = 5
-                                    wait_time = 2 
-                                    for _ in range(retries):
-                                        message = conn.recv(self.LENGTH)
-                                        if message:
-                                            break
-                                        else:
-                                            time.sleep(wait_time)
-                                except socket.timeout:
-                                    pass
-                                if message:
-                                    self.receive_message(message, sock)
-                                #if message is empty, the server has died
-                                else:
-                                    self.disconnect_from_lan(sock)
-                            # break
+                    # if sock == sys.stdin:
+                    #     self.handle_input()
+                    # else:
+                    threading.Thread(target=self.handle_input).start()
+                    self.listen_message(sock)
                                 
         except ConnectionRefusedError:
             print("Connection to the bridge refused. Exiting...")

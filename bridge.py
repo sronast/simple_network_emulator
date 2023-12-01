@@ -5,6 +5,7 @@ import pickle
 import socket
 import select
 import time
+import threading
 from utils import *
 
 class Bridge:
@@ -115,7 +116,8 @@ class Bridge:
         #Waiting for connection set-up requests from stations / routers.
         try:
             while True:
-                read_sockets, write_socket, error_socket = select.select(list(self.all_connections1)+[sys.stdin],[],[])
+                # read_sockets, write_socket, error_socket = select.select(list(self.all_connections1)+[sys.stdin],[],[])
+                read_sockets, write_socket, error_socket = select.select(list(self.all_connections1),[],[])
                 for sock in read_sockets:
                     #if server receives a new connection 
                     if sock == self.server_socket:
@@ -141,10 +143,11 @@ class Bridge:
                         # print(status)
                         connection.send(pickle.dumps({'message': status, 'type': 'connection_establishment'}))
 
-                    elif sock == sys.stdin:
-                        self.handle_input()
+                    # elif sock == sys.stdin:
+                    #     self.handle_input()
                     
                     else:
+                        threading.Thread(target=self.handle_input).start()
                         hostname,port = sock.getpeername()
                         #which port is receiving the message
                         port_of_bridge =  self.station_ip_to_port['{}:{}'.format(hostname, port)]
@@ -198,6 +201,7 @@ class Bridge:
                                     
                             print('Available prots: ', self.available_ports)   
                             print('Used ports: ', self.used_ports)   
+                        print("Enter the Destination or any command: ", end = "")
                         except:
                             print('In except')
                             self.free_bridge_port(port_of_bridge, sock)
