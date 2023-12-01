@@ -55,7 +55,7 @@ class Bridge:
     def free_bridge_port(self, port_of_bridge, sock):
         hostname, port = sock.getpeername()
         print(self.station_ip_to_port)
-        self.station_ip_to_port.pop(f'{hostname}:{port}')
+        self.station_ip_to_port.pop('{}:{}'.format(hostname, port))
         self.port_to_station_ip.pop(port_of_bridge)
         #free the port
         self.available_ports.add(port_of_bridge)
@@ -64,25 +64,25 @@ class Bridge:
         mac_of_station = self.reverse_bridge_table[port_of_bridge]
         self.reverse_bridge_table.pop(port_of_bridge, None)
         #remove the mapping form the bridge table if exists
-        self.bridge_table.pop(f'{mac_of_station}', None)
-        # print(f'>>>{hostname} at port ({port_of_bridge}) disconnected!!!!')
+        self.bridge_table.pop('{}'.format(mac_of_station), None)
+        # print('>>>{} at port ({}) disconnected!!!!'.format(hostname, port_of_bridge))
         self.all_connections1.remove(sock)
 
-        print(f'Station at port {port_of_bridge} disconnected.....')
+        print('Station at port {} disconnected.....'.format(port_of_bridge))
         print('Remaining conns: ', self.all_connections1)
         print(self.station_ip_to_port)
-        print(f'Available ports = {self.available_ports}')
+        print('Available ports = {}'.format(self.available_ports))
 
-        # self.broadcast(sock, f'>>>{hostname}({port}) disconnected!!!!')
+        # self.broadcast(sock, '>>>{}({}) disconnected!!!!'.format(hostname, port))
         sock.close()
 
     def print_tables(self, message):
         if message == 'bt':
-            print(f'\tMAC\t\tPort')
+            print('\tMAC\t\tPort')
             for k,v in self.bridge_table.items():
-                print(f'{k}\t\t{v}')
+                print('{}\t\t{}'.format(k, v))
         else:
-            print(f'Command {message} not found')
+            print('Command {} not found'.format(message))
         return
     
     def handle_input(self):
@@ -106,10 +106,10 @@ class Bridge:
         self.server_socket.listen(self.num_ports)
         ip_addr = self.server_socket.getsockname()[0]
         port_addr = self.server_socket.getsockname()[1]
-        print(f'=== Hostname: {ip_addr} Listening on Port: {port_addr} ===')
+        print('=== Hostname: {} Listening on Port: {} ==='.format(ip_addr, port_addr))
 
         #create json file to save bridge ip and port
-        with open(f'bridge_{self.lan_name}.json', 'w') as f:
+        with open('bridge_{}.json'.format(self.lan_name), 'w') as f:
             json.dump({'ip': ip_addr, 'port':port_addr}, f)
 
         #Waiting for connection set-up requests from stations / routers.
@@ -128,12 +128,12 @@ class Bridge:
                             self.all_connections1.add(connection)
                             #assign random port of the bridge to the client
                             random_port_of_bridge = self.available_ports.pop()
-                            self.station_ip_to_port[f'{address[0]}:{address[1]}'] = random_port_of_bridge
+                            self.station_ip_to_port['{}:{}'.format(address[0], address[1])] = random_port_of_bridge
                             self.port_to_station_ip[random_port_of_bridge] = connection
                             self.reverse_bridge_table[random_port_of_bridge] = None
                             status = 'accept'
-                            print(f'Station connected at port {random_port_of_bridge}.......')
-                        # self.broadcast(connection, f'>>>New client {address[0]}({address[1]}) connected<<<')
+                            print('Station connected at port {}.......'.format(random_port_of_bridge))
+                        # self.broadcast(connection, '>>>New client {}({}) connected<<<'.format(address[0], address[1]))
                         #no port available in the bridge
                         else:
                             status = 'reject'
@@ -147,7 +147,7 @@ class Bridge:
                     else:
                         hostname,port = sock.getpeername()
                         #which port is receiving the message
-                        port_of_bridge =  self.station_ip_to_port[f'{hostname}:{port}']
+                        port_of_bridge =  self.station_ip_to_port['{}:{}'.format(hostname, port)]
                         try:
                             #message is a frame which contains source and destination mac addresses
                             try:
@@ -212,7 +212,7 @@ class Bridge:
         print("=== All clients closed ===")
 
 if __name__ == '__main__':
-    assert len(sys.argv) == 3, f'Usuage: python3 bridge.py lan-name num-ports'
+    assert len(sys.argv) == 3, 'Usuage: python3 bridge.py lan-name num-ports'
     lan_name = sys.argv[1]
     try:
         num_ports = int(sys.argv[2])
@@ -225,7 +225,7 @@ if __name__ == '__main__':
 
     #check if the bridge with name same as the one in the argument is already there
     if lan_name in all_lans:
-        print(f'Bridge with name {lan_name} already exists')
+        print('Bridge with name {} already exists'.format(lan_name))
         sys.exit()
     else:
         all_lans[lan_name] = num_ports
@@ -243,5 +243,5 @@ if __name__ == '__main__':
     save_to_json('all_lans.json', all_lans)
 
     ##remove json file associated with the bridge
-    if os.path.exists(f'bridge_{lan_name}.json'):
-        os.remove(f'bridge_{lan_name}.json')
+    if os.path.exists('bridge_{}.json'.format(lan_name)):
+        os.remove('bridge_{}.json'.format(lan_name))

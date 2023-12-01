@@ -35,11 +35,11 @@ class Station:
                 print(f"LAN {bridge_name} is unavilable ...")
                 print('\n')
                 continue
-            lan_info = load_json_file(f'bridge_{bridge_name}.json')
+            lan_info = load_json_file('bridge_{}.json'.format(bridge_name))
             bridge_ip = lan_info['ip']
             bridge_port = lan_info['port']
             print('all info gathered')
-            print(f'Bridge ip: {bridge_ip} Bridge port: {bridge_port}')
+            print('Bridge ip: {} Bridge port: {}'.format(bridge_ip, bridge_port))
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 retries = 5
@@ -53,53 +53,51 @@ class Station:
                         self.all_connections.add(sock)
                         hostname,port=sock.getpeername()
                         station_ip = self.station_info[interface]["ip"]
-                        self.socket_to_ip[f'{hostname}:{port}'] = station_ip
+                        self.socket_to_ip['{}:{}'.format(hostname, port)] = station_ip
                         self.ip_to_socket[station_ip] = sock
                         break
                     elif response['message'] == 'reject':
-                        print('No free port on the bridge {bridge_name}. The connection cannot be established...')
+                        print('No free port on the bridge {}. The connection cannot be established...'.format(bridge_name))
                         break
                     else:
-                        print(f"Connection to {bridge_name} on interface {interface} rejected..\nRetrying...")
+                        print("Connection to {} on interface {} rejected..\nRetrying...".format(bridge_name, interface))
                     time.sleep(wait_time)
                     
                     # ready_to_read, _, _ = select.select([s], [], [], wait_time)
                         
             except Exception as e:
-                print(f"Error connecting to {bridge_name}: {e}")
-        ########### RS #######
-
+                print("Error connecting to {}: {}".format(bridge_name, e))
 
     def print_tables(self, message):
         if message == 'rt':
                 print('============ Printing Routing Table ===========')
-                print(f'Network Address \t Next Hop Address \t Netmask \t Interface to next Hop')
+                print('Network Address \t Next Hop Address \t Netmask \t Interface to next Hop')
                 for k,v in self.routing_table.items():
-                    res = f'{k}'
+                    res = '{}'.format(k)
                     for kk, vv in v.items():
-                        res = res + f'\t {vv}'
+                        res = res + '\t {}'.format(vv)
                     print(res)
                 print('============ END ===========')
         elif message == 'dns':
             print('=========== Printing DNS Table ===============')
             
-            print(f'Hostname \t IP')
+            print('Hostname \t IP')
             for k, v in self.hostname_mapping.items():
-                print(f'{k}\t{v}')
+                print('{k}\t{v}')
             print('============ END ===========')
         elif message == 'arp':
             print('=========== Printing ARP Table ===============')
-            print(f'IP \t MAC')
+            print('IP \t MAC')
             for k,v in self.arp_table.items():
-                print(f'{k} \t {v}')
+                print('{} \t {}'.format(k, v))
             ## implement here 
             print('============ END ===========')
         else:
-            print(f'Command {message} not found')
+            print('Command {} not found'.format(message))
         return
     
     def send_arp(self, arp_msg, sock):
-        print(f'sending {arp_msg["type"]}.....')
+        print('sending {}.....'.format(arp_msg['type']))
         sock.send(pickle.dumps(arp_msg))
     
     def create_ip_packet(self,source_ip, destination_ip, message):
@@ -165,7 +163,7 @@ class Station:
         destination_ip = message['destination_ip']
         source_ip = message['source_ip']
         socket_ip, socket_port = sock.getpeername()
-        my_ip = self.socket_to_ip[f'{socket_ip}:{socket_port}']
+        my_ip = self.socket_to_ip['{}:{}'.format(socket_ip, socket_port)]
         my_name =  self.reverse_hostname_mapping[my_ip]
         
         if message['source_ip'] not in self.arp_table:
@@ -175,7 +173,7 @@ class Station:
             if self.is_router:
                 #check if the destination ip is in the same network
                 next_interface = self.get_next_interface(destination_ip)
-                print(f'Next interface...{next_interface}')
+                print('Next interface...{}'.format(next_interface))
                 #if yes drop the packet
                 if next_interface == my_name:
                     print('Received ARP request in router....The destination host is in  the same network...Dropping...')
@@ -215,7 +213,7 @@ class Station:
 
     def process_frame(self, message, sock):
         socket_ip, socket_port = sock.getpeername()
-        my_ip = self.socket_to_ip[f'{socket_ip}:{socket_port}']
+        my_ip = self.socket_to_ip['{}:{}'.format(socket_ip, socket_port)]
         my_name =  self.reverse_hostname_mapping[my_ip]
         ip_packet = message['ip_packet']
         destination_ip = ip_packet['destination_ip']
@@ -233,8 +231,8 @@ class Station:
         else:
             if self.station_info[my_name]['mac'] == message['destination_mac']:
                 ip_packet = message['ip_packet']
-                print(f'Received message from station {self.reverse_hostname_mapping[ip_packet["source_ip"]]}')
-                print(f'Message: {ip_packet["message"]}')
+                print('Received message from station {}'.format(self.reverse_hostname_mapping[ip_packet["source_ip"]]))
+                print('Message: {}'.format(ip_packet["message"]))
             else:
                 print('Received message destined for different station....dropping...')
     
@@ -251,7 +249,7 @@ class Station:
         #     print('Wrong input format...')
         #     return
         # destination, message = usr_input.split(';')
-        # print(f'dest: {destination}, message: {message}')
+        # print('dest: {}, message: {}'.format(destination, message))
 
         destination = input("Enter the Destination or any command: ")
         message = input("Enter the Message or any command: ")
@@ -272,9 +270,9 @@ class Station:
     #if a bridge is disconnected reomove the connection
     def disconnect_from_lan(self, sock):
         socket_ip,socket_port=sock.getpeername()
-        station_ip = self.socket_to_ip[f'{socket_ip}:{socket_port}']
+        station_ip = self.socket_to_ip['{}:{}'.format(socket_ip, socket_port)]
         self.ip_to_socket.pop(station_ip, None)
-        self.socket_to_ip.pop(f'{socket_ip}:{socket_port}', None)
+        self.socket_to_ip.pop('{}:{}'.format(socket_ip, socket_port), None)
         station_name = self.reverse_hostname_mapping[station_ip]
         print(station_name, '-------------')
         print(self.station_info['stations'])
@@ -288,7 +286,7 @@ class Station:
         try:
             #try connecting to lans 
             self.connect_to_lans()
-            # print(f'Enter the message in format: destination_name;message')
+            # print('Enter the message in format: destination_name;message')
             while True:
                 if len(self.all_connections) == 0:
                     print('No active connections...')
