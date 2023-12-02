@@ -345,7 +345,7 @@ class Station:
                     print('No active connections...')
                     break
                 self.possible_inputs=[sys.stdin]+list(self.all_connections)
-                self.possible_inputs = list(self.all_connections)
+                # self.possible_inputs = list(self.all_connections)
                 # read_sockets,_, _ = select.select(self.possible_inputs,[],[])
                 # for sock in read_sockets:
                 for sock in self.possible_inputs:
