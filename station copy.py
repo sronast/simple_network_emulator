@@ -8,7 +8,6 @@ import pickle
 import select
 import ipaddress
 import time
-import threading
 from collections import deque
 from utils import *
 
@@ -27,20 +26,20 @@ class Station:
         self.ip_to_socket = {}
 
     def connect_to_lans(self):
-        # print(self.station_info["stations"])
+        print(self.station_info["stations"])
         for interface in self.station_info["stations"]:
             bridge_name = self.station_info[interface]["lan"]
             #check if there is an active lan with lan_name
             all_bridges = load_json_file('all_lans.json')
             if bridge_name not in all_bridges:
-                print("LAN {} is unavilable ...".format(bridge_name))
+                print(f"LAN {bridge_name} is unavilable ...")
                 print('\n')
                 continue
             lan_info = load_json_file('bridge_{}.json'.format(bridge_name))
             bridge_ip = lan_info['ip']
             bridge_port = lan_info['port']
-            # print('all info gathered')
-            # print('Bridge ip: {} Bridge port: {}'.format(bridge_ip, bridge_port))
+            print('all info gathered')
+            print('Bridge ip: {} Bridge port: {}'.format(bridge_ip, bridge_port))
             try:
                 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 retries = 5
@@ -50,7 +49,7 @@ class Station:
                     response = sock.recv(self.LENGTH)
                     response = pickle.loads(response)
                     if response['message'] == 'accept':
-                        print("Connected to {} on interface {}.........".format(bridge_name, interface))
+                        print(f"Connected to {bridge_name} on interface {interface}.........")
                         self.all_connections.add(sock)
                         hostname,port=sock.getpeername()
                         station_ip = self.station_info[interface]["ip"]
@@ -126,148 +125,109 @@ class Station:
     def forward_message(self, messsage, sock):
         sock.send(pickle.dumps(messsage))
 
-    def get_next_interface(self, destination_ip):
-        for network_prefix, entry in self.routing_table.items():
-            netmask = entry['mask']
-            destination_network_prefix = ipaddress.ip_network((destination_ip, netmask), strict=False).network_address
-            if destination_network_prefix == ipaddress.ip_address(network_prefix):
-                return entry['next_interface'], entry['next_hop']
-        #returning default entry       
-        entry = self.routing_table['0.0.0.0']
-        return entry['next_interface'], entry['next_hop']
- 
-
     def prepare_message(self, destination, message):
         destination_ip = self.hostname_mapping[destination]
-        destination_mac = None
+        destination_mac = self.arp_table.get(destination_ip, None)
 
         source_name = self.station_info['stations'][0]
         source_ip = self.station_info[source_name]['ip']
         source_mac = self.station_info[source_name]['mac']
         sock = self.ip_to_socket[source_ip]
 
-        #to find if the destination is in the same lan
-        next_interface, next_hop_ip = self.get_next_interface(destination_ip)
-        next_interface_ip = self.hostname_mapping[next_interface]
-        # next_interface_socket = self.ip_to_socket[next_interface_ip]
-
-        #destination in the same lan
-        if next_hop_ip == '0.0.0.0':
-            if destination_ip in self.arp_table:
-                destination_mac = self.arp_table[destination_ip]
-                self.send_message(source_ip, destination_ip, source_mac, destination_mac, message, sock)
-            else:
-                self.pending_queue.append({'source_ip':source_ip ,'destination_ip': destination_ip, 'message':message, 'source_mac': source_mac, 'sock':sock})
-                self.send_arp({'source_ip':source_ip ,'destination_ip': destination_ip, 'source_mac': source_mac, 'destination_mac':'ff:ff:ff:ff:ff:ff', 'type':'ARP_request'}, sock)
-        
-        #destination is in the different lan
+        if not destination_mac:
+            self.pending_queue.append({'source_ip':source_ip ,'destination_ip': destination_ip, 'message':message, 'source_mac': source_mac, 'sock':sock})
+            self.send_arp({'source_ip':source_ip ,'destination_ip': destination_ip, 'source_mac': source_mac, 'destination_mac':'ff:ff:ff:ff:ff:ff', 'type':'ARP_request'}, sock)
         else:
-            if next_hop_ip in self.arp_table:
-                destination_mac = self.arp_table[next_hop_ip]
-                self.send_message(source_ip, destination_ip, source_mac, destination_mac, message, sock)
-            
-            else:
-                self.pending_queue.append({'source_ip':source_ip ,'destination_ip': destination_ip, 'message':message, 'source_mac': source_mac, 'sock':sock})
-                #get mac of next hop router
-                self.send_arp({'source_ip':source_ip ,'destination_ip': next_hop_ip, 'source_mac': source_mac, 'destination_mac':'ff:ff:ff:ff:ff:ff', 'type':'ARP_request'}, sock)
+            self.send_message(source_ip, destination_ip, source_mac, destination_mac, message, sock)
     
     def process_pending_queue(self):
         new_queue = deque()
         for item in self.pending_queue:
-            destination_ip = item['destination_ip']
-            next_interface, next_hop_ip = self.get_next_interface(destination_ip)
-            #get socket associated with the next interface
-            next_interface_ip = self.hostname_mapping[next_interface]
-            next_interface_socket = self.ip_to_socket[next_interface_ip]
-            #if the destination is in the same lan
-            if next_hop_ip == '0.0.0.0':
-                destination_mac = self.arp_table.get(destination_ip, None)
-            #destination in the different lan
-            else:
-                destination_mac = self.arp_table.get(next_hop_ip,None)
-            
+            destination_mac = self.arp_table.get(item['destination_ip'], None)
             if destination_mac:
-                self.send_message(item['source_ip'], item['destination_ip'], item['source_mac'], destination_mac, item['message'], next_interface_socket)
+                self.send_message(item['source_ip'], item['destination_ip'], item['source_mac'], destination_mac, item['message'], item['sock'])
             else:
                 new_queue.append(item)
         self.pending_queue = new_queue
             
     #consult routing table to get next interface
+    def get_next_interface(self, destination_ip):
+        for network_prefix, entry in self.routing_table.items():
+            netmask = entry['mask']
+            destination_network_prefix = ipaddress.ip_network((destination_ip, netmask), strict=False).network_address
+            if destination_network_prefix == ipaddress.ip_address(network_prefix):
+                return entry['next_interface']
+        return False, False
+
     def process_arp(self, message, sock):
         destination_ip = message['destination_ip']
         source_ip = message['source_ip']
         socket_ip, socket_port = sock.getpeername()
         my_ip = self.socket_to_ip['{}:{}'.format(socket_ip, socket_port)]
         my_name =  self.reverse_hostname_mapping[my_ip]
-        my_mac = self.station_info[my_name]['mac']
         
-        # if message['source_ip'] not in self.arp_table:
-        #     self.arp_table[message['source_ip']] = message['source_mac']
+        if message['source_ip'] not in self.arp_table:
+            self.arp_table[message['source_ip']] = message['source_mac']
 
-        print(f'received {message["type"]} at {my_name}')
         if message['type'] == 'ARP_request':
-            
-            if my_ip == destination_ip:
-                self.send_arp({'source_ip':my_ip ,'destination_ip': source_ip, 'source_mac': my_mac, 'destination_mac':message['source_mac'], 'type':'ARP_response'}, sock) 
-           
+            if self.is_router:
+                #check if the destination ip is in the same network
+                next_interface = self.get_next_interface(destination_ip)
+                print('Next interface...{}'.format(next_interface))
+                #if yes drop the packet
+                if next_interface == my_name:
+                    print('Received ARP request in router....The destination host is in  the same network...Dropping...')
+                #else retrun the mac address of the router as arp reply
+                else:
+                    print('Received ARP request....The destination host is in  the different network...Forwarding...')
+                    interface_ip = self.hostname_mapping[next_interface]
+                    interface_socket = self.ip_to_socket[interface_ip]
+                    self.send_arp(message, interface_socket)
+            elif my_ip == destination_ip:
+                print("Received ARP request...processing")
+                my_mac = self.station_info[my_name]['mac']
+                # sock = self.ip_to_socket[my_ip]
+                self.send_arp({'source_ip':my_ip ,'destination_ip': source_ip, 'source_mac': my_mac, 'destination_mac':message['source_mac'], 'type':'ARP_response'}, sock)
             else:
                 print("Received ARP request destined for different station...dropping.....")
-                print(my_ip, destination_ip)
+        
         elif message['type'] == 'ARP_response':
-            if my_ip == destination_ip:
+            if self.is_router:
+                print('Received ARP response in router')
+                #forward the packet to necesary hop/drop
+                next_interface = self.get_next_interface(destination_ip)
+                #if yes drop the packet
+                if next_interface == my_name:
+                    print('Received ARP request in router....The destination host is in  the same network...Dropping...')
+                #else retrun the mac address of the router as arp reply
+                else:
+                    print('Received ARP request....The destination host is in  the different network...Forwarding...')
+                    interface_ip = self.hostname_mapping[next_interface]
+                    interface_socket = self.ip_to_socket[interface_ip]
+                    self.send_arp(message, interface_socket)
+            elif my_ip == destination_ip:
                 print("Received ARP response...Processing pending queue..")
-                self.arp_table[source_ip] = message['source_mac']
                 self.process_pending_queue()
             else:
-                print("Received ARP response destined for different station.......")
+                print("Received ARP response destined for different station..updated ARP cache.....")
 
     def process_frame(self, message, sock):
-        
         socket_ip, socket_port = sock.getpeername()
         my_ip = self.socket_to_ip['{}:{}'.format(socket_ip, socket_port)]
         my_name =  self.reverse_hostname_mapping[my_ip]
         ip_packet = message['ip_packet']
         destination_ip = ip_packet['destination_ip']
-        source_ip = ip_packet['source_ip']
-        print(f'Received {message} at {my_name}')
         if self.is_router:
-            print(self.ip_to_socket)
-            ########1 dec #######
-            #if router received an ip packet then it must forward
-            next_interface, next_hop_ip = self.get_next_interface(destination_ip)
-            next_interface_ip = self.hostname_mapping[next_interface]
-            next_interface_sock = self.ip_to_socket[next_interface_ip]
-
-            #if the packet is destined for host in the next interface
-            if next_hop_ip == '0.0.0.0':
-                print('Packet is destined for network in the next interface....')
-                if destination_ip in self.arp_table:
-                    message['destination_mac'] = self.arp_table.get(destination_ip)
-                    self.forward_message(message, next_interface_sock)
-
-                else:
-                    print('Destination ip not in the arp table....')
-                    #add the packet in the pending_queue
-                    self.pending_queue.append({'source_ip':source_ip ,'destination_ip': destination_ip, 'message':ip_packet['message'], 'source_mac': message['source_mac'], 'sock':next_interface_sock})
-
-                    #send arp request
-                    self.send_arp({'source_ip':next_interface_ip ,'destination_ip': destination_ip, 'source_mac': message['source_mac'], 'destination_mac':'ff:ff:ff:ff:ff:ff', 'type':'ARP_request'}, next_interface_sock)
-            
-            #packet to be delivered in different lan
+            next_interface = self.get_next_interface(destination_ip)
+            #if yes drop the packet
+            if next_interface == my_name:
+                print('Received IP Packet in a router....The destination host is in  the same network...Dropping...')
+            #else retrun the mac address of the router as arp reply
             else:
-                print('Packet for host in different lan')
-                #if mac of next hop present in arp table
-                if next_hop_ip in self.arp_table:
-                    message['destination_mac'] = self.arp_table[next_hop_ip]
-                    self.forward_message(message, next_interface_sock)
-
-                else:
-                    #add the packet in the pending_queue
-                    self.pending_queue.append({'source_ip':source_ip ,'destination_ip': destination_ip, 'message':ip_packet['message'], 'source_mac': message['source_mac'], 'sock':next_interface_sock})
-
-                    #send arp request
-                    self.send_arp({'source_ip':next_interface_ip ,'destination_ip':next_hop_ip , 'source_mac': message['source_mac'], 'destination_mac':'ff:ff:ff:ff:ff:ff', 'type':'ARP_request'}, next_interface_sock)
-
+                print('Received IP Packet....The destination host is in  the different network...Forwarding...')
+                interface_ip = self.hostname_mapping[next_interface]
+                interface_socket = self.ip_to_socket[interface_ip]
+                self.forward_message(message, interface_socket)
         else:
             if self.station_info[my_name]['mac'] == message['destination_mac']:
                 ip_packet = message['ip_packet']
@@ -291,13 +251,13 @@ class Station:
         # destination, message = usr_input.split(';')
         # print('dest: {}, message: {}'.format(destination, message))
 
-        destination = input()
-        message = input("Enter the Message/command: ")
+        destination = input("Enter the Destination or any command: ")
+        message = input("Enter the Message or any command: ")
         destination, message = destination.strip(), message.strip()
 
-        if self.is_router and destination != 'cmd':
+        if self.is_router and destination != 'print':
             print('Router only supports commands....')
-        elif destination.lower() == 'cmd':
+        elif destination.lower() == 'print':
             self.print_tables(message) 
         elif destination == self.station_info["stations"][0]:
             print('Cannot send message to itself...')
@@ -328,40 +288,30 @@ class Station:
             self.connect_to_lans()
             # print('Enter the message in format: destination_name;message')
             while True:
-                print('\n==== Enter your input ========')
-                print("Enter the Destination Name or Type cmd for command: ")
                 if len(self.all_connections) == 0:
                     print('No active connections...')
                     break
-                # self.possible_inputs = [sys.stdin]+list(self.all_connections)
-                self.possible_inputs = list(self.all_connections)
-                # read_sockets,_, _ = select.select(self.possible_inputs,[],[])
-                # for sock in read_sockets:
-                for sock in self.possible_inputs:
+                self.possible_inputs=[sys.stdin]+list(self.all_connections)
+                read_sockets,_, _ = select.select(self.possible_inputs,[],[])
+                for sock in read_sockets:
                     #if client needs to send message to the server
                     if sock == sys.stdin:
                         self.handle_input()
                     else:
-                        threading.Thread(target=self.handle_input).start()
                         for conn in self.all_connections.copy():
                         #if client receives message from the server
                             if sock == conn:
                                 try:
                                     retries = 5
-                                    wait_time = 1 
+                                    wait_time = 2 
                                     for _ in range(retries):
                                         message = conn.recv(self.LENGTH)
                                         if message:
                                             break
                                         else:
-                                            print("Retrying...")
                                             time.sleep(wait_time)
                                 except socket.timeout:
                                     pass
-                                except KeyboardInterrupt:
-                                    print('\n!!! Keyboard interrupt !!!')
-                                    for conn in self.all_connections.copy():
-                                        self.disconnect_from_lan(conn)
                                 if message:
                                     self.receive_message(message, sock)
                                 #if message is empty, the server has died
@@ -376,10 +326,6 @@ class Station:
                 self.disconnect_from_lan(conn)
             print('Keyboard Interrupt... Station disconnected from all lans')
 
-    def close(self):
-        for sock in self.possible_inputs:
-            sock.close()
-
 if __name__ == '__main__':
     assert len(sys.argv) == 5, 'Usage: python station.py -no/route interface routingtable hostname'
     is_router = sys.argv[1] == "-route"
@@ -391,4 +337,4 @@ if __name__ == '__main__':
     # is_router = input("Is this station a router? (y/n): ").lower() == 'y'
     station = Station(inerface_file, routingtable_file, hostname_file, is_router)
     station.start()
-    station.close()
+    

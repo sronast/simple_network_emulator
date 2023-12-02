@@ -34,7 +34,6 @@ class Bridge:
         print('Bridge Table')
         print(self.bridge_table)
         destination_port = self.bridge_table[destination_mac]
-        
         #get tcp connection asssociated with the port
         client = self.port_to_station_ip[destination_port]
         client.send(frame)
@@ -68,12 +67,10 @@ class Bridge:
         self.bridge_table.pop('{}'.format(mac_of_station), None)
         # print('>>>{} at port ({}) disconnected!!!!'.format(hostname, port_of_bridge))
         self.all_connections1.remove(sock)
-
         print('Station at port {} disconnected.....'.format(port_of_bridge))
         print('Remaining conns: ', self.all_connections1)
         print(self.station_ip_to_port)
         print('Available ports = {}'.format(self.available_ports))
-
         # self.broadcast(sock, '>>>{}({}) disconnected!!!!'.format(hostname, port))
         sock.close()
 
@@ -93,11 +90,8 @@ class Bridge:
         #     return
         # dest,command = str(usr_input).split(';')
         # dest,command = dest.strip(), command.strip()
-
         dest = input("Enter the Destination or any command: ")
         command = input("Enter the Message or any command: ")
-        dest,command = dest.strip(), command.strip()
-
         if dest.lower() == 'print':
             self.print_tables(command)
         else:
@@ -109,12 +103,10 @@ class Bridge:
         ip_addr = self.server_socket.getsockname()[0]
         port_addr = self.server_socket.getsockname()[1]
         print('=== Hostname: {} Listening on Port: {} ==='.format(ip_addr, port_addr))
-
-        #create json file to save bridge ip and port
+        # create json file to save bridge ip and port
         with open('bridge_{}.json'.format(self.lan_name), 'w') as f:
             json.dump({'ip': ip_addr, 'port':port_addr}, f)
-
-        #Waiting for connection set-up requests from stations / routers.
+        # Waiting for connection set-up requests from stations / routers.
         try:
             while True:
                 # read_sockets, write_socket, error_socket = select.select(list(self.all_connections1)+[sys.stdin],[],[])
@@ -124,8 +116,7 @@ class Bridge:
                     if sock == self.server_socket:
                         connection, address = self.server_socket.accept()
                         # connection.setblocking(False)
-                        ### Connect to bridge only if ports are available in bridge
-                        
+                        ### Connect to bridge only if ports are available in bridge 
                         if self.used_ports < self.num_ports:
                             self.used_ports += 1 
                             self.all_connections1.add(connection)
@@ -143,10 +134,8 @@ class Bridge:
                         # print('Sending response to the clent.....')
                         # print(status)
                         connection.send(pickle.dumps({'message': status, 'type': 'connection_establishment'}))
-
                     elif sock == sys.stdin:
                         self.handle_input()
-                    
                     else:
                         threading.Thread(target=self.handle_input).start()
                         hostname,port = sock.getpeername()
@@ -156,23 +145,18 @@ class Bridge:
                             #message is a frame which contains source and destination mac addresses
                             try:
                                 retries = 5
-                                wait_time = 1
+                                wait_time = 2 
                                 for _ in range(retries):
                                     message = sock.recv(self.LENGTH)
                                     if message:
                                         break
                                     else:
-                                        print("Retrying...")
                                         time.sleep(wait_time)
                             except socket.timeout:
                                 pass
-                            except KeyboardInterrupt:
-                                print('\n!!! Keyboard interrupt !!!')
-                                self.server_socket.close()
                             if not message:
                                 self.free_bridge_port(port_of_bridge, sock)
                                 continue
-
                             frame = pickle.loads(message)
                             print('Message from client')
                             print(frame)
@@ -196,16 +180,14 @@ class Bridge:
                                     print('...........Unicast:: ')
                                     #send the frame to the destination
                                     self.unicast(message, destination_mac)
-                              
-
                                 #false broadcast the frame to all ports except incoming
                                 else:
                                     #if destination mac address not in the bridge table broadcast the frame
                                     self.broadcast(message, source_mac)
                                     print('...........Broadcast')
-                                    
                             print('Available prots: ', self.available_ports)   
                             print('Used ports: ', self.used_ports)   
+                            # print("Enter the Destination or any command: ", end = "")
                         except:
                             print('In except')
                             self.free_bridge_port(port_of_bridge, sock)
@@ -214,7 +196,6 @@ class Bridge:
         except KeyboardInterrupt:
             print('\n!!! Keyboard interrupt !!!')
             self.server_socket.close()
-
     def close(self):
         self.server_socket.close()
         print('=== Server socket closed ===')

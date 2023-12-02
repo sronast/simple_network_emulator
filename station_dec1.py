@@ -8,7 +8,6 @@ import pickle
 import select
 import ipaddress
 import time
-import threading
 from collections import deque
 from utils import *
 
@@ -33,7 +32,7 @@ class Station:
             #check if there is an active lan with lan_name
             all_bridges = load_json_file('all_lans.json')
             if bridge_name not in all_bridges:
-                print("LAN {} is unavilable ...".format(bridge_name))
+                print(f"LAN {bridge_name} is unavilable ...")
                 print('\n')
                 continue
             lan_info = load_json_file('bridge_{}.json'.format(bridge_name))
@@ -50,7 +49,7 @@ class Station:
                     response = sock.recv(self.LENGTH)
                     response = pickle.loads(response)
                     if response['message'] == 'accept':
-                        print("Connected to {} on interface {}.........".format(bridge_name, interface))
+                        print(f"Connected to {bridge_name} on interface {interface}.........")
                         self.all_connections.add(sock)
                         hostname,port=sock.getpeername()
                         station_ip = self.station_info[interface]["ip"]
@@ -170,6 +169,7 @@ class Station:
                 self.pending_queue.append({'source_ip':source_ip ,'destination_ip': destination_ip, 'message':message, 'source_mac': source_mac, 'sock':sock})
                 #get mac of next hop router
                 self.send_arp({'source_ip':source_ip ,'destination_ip': next_hop_ip, 'source_mac': source_mac, 'destination_mac':'ff:ff:ff:ff:ff:ff', 'type':'ARP_request'}, sock)
+
     
     def process_pending_queue(self):
         new_queue = deque()
@@ -284,14 +284,14 @@ class Station:
             self.process_frame(message, sock)
 
     def handle_input(self):
-        # usr_input = sys.stdin.readline()
+        usr_input = sys.stdin.readline()
         # if ';' not in usr_input:
         #     print('Wrong input format...')
         #     return
         # destination, message = usr_input.split(';')
         # print('dest: {}, message: {}'.format(destination, message))
 
-        destination = input()
+        destination = input("Enter the Destination Name or Type cmd for command: ")
         message = input("Enter the Message/command: ")
         destination, message = destination.strip(), message.strip()
 
@@ -328,40 +328,31 @@ class Station:
             self.connect_to_lans()
             # print('Enter the message in format: destination_name;message')
             while True:
-                print('\n==== Enter your input ========')
-                print("Enter the Destination Name or Type cmd for command: ")
+                print('\n==== Press enter for input ========')
                 if len(self.all_connections) == 0:
                     print('No active connections...')
                     break
-                # self.possible_inputs = [sys.stdin]+list(self.all_connections)
-                self.possible_inputs = list(self.all_connections)
-                # read_sockets,_, _ = select.select(self.possible_inputs,[],[])
-                # for sock in read_sockets:
-                for sock in self.possible_inputs:
+                self.possible_inputs=[sys.stdin]+list(self.all_connections)
+                read_sockets,_, _ = select.select(self.possible_inputs,[],[])
+                for sock in read_sockets:
                     #if client needs to send message to the server
                     if sock == sys.stdin:
                         self.handle_input()
                     else:
-                        threading.Thread(target=self.handle_input).start()
                         for conn in self.all_connections.copy():
                         #if client receives message from the server
                             if sock == conn:
                                 try:
-                                    retries = 5
-                                    wait_time = 1 
+                                    retries = 1
+                                    wait_time = 0 
                                     for _ in range(retries):
                                         message = conn.recv(self.LENGTH)
                                         if message:
                                             break
                                         else:
-                                            print("Retrying...")
                                             time.sleep(wait_time)
                                 except socket.timeout:
                                     pass
-                                except KeyboardInterrupt:
-                                    print('\n!!! Keyboard interrupt !!!')
-                                    for conn in self.all_connections.copy():
-                                        self.disconnect_from_lan(conn)
                                 if message:
                                     self.receive_message(message, sock)
                                 #if message is empty, the server has died
@@ -376,10 +367,6 @@ class Station:
                 self.disconnect_from_lan(conn)
             print('Keyboard Interrupt... Station disconnected from all lans')
 
-    def close(self):
-        for sock in self.possible_inputs:
-            sock.close()
-
 if __name__ == '__main__':
     assert len(sys.argv) == 5, 'Usage: python station.py -no/route interface routingtable hostname'
     is_router = sys.argv[1] == "-route"
@@ -391,4 +378,4 @@ if __name__ == '__main__':
     # is_router = input("Is this station a router? (y/n): ").lower() == 'y'
     station = Station(inerface_file, routingtable_file, hostname_file, is_router)
     station.start()
-    station.close()
+    
