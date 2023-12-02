@@ -187,7 +187,7 @@ class Bridge:
                                     print('...........Broadcast')
                             print('Available prots: ', self.available_ports)   
                             print('Used ports: ', self.used_ports)   
-                            print("Enter the Destination or any command: ", end = "")
+                            # print("Enter the Destination or any command: ", end = "")
                         except:
                             print('In except')
                             self.free_bridge_port(port_of_bridge, sock)

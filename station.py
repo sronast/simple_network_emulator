@@ -33,7 +33,7 @@ class Station:
             #check if there is an active lan with lan_name
             all_bridges = load_json_file('all_lans.json')
             if bridge_name not in all_bridges:
-                print(f"LAN {bridge_name} is unavilable ...")
+                print("LAN {} is unavilable ...".format(bridge_name))
                 print('\n')
                 continue
             lan_info = load_json_file('bridge_{}.json'.format(bridge_name))
@@ -50,7 +50,7 @@ class Station:
                     response = sock.recv(self.LENGTH)
                     response = pickle.loads(response)
                     if response['message'] == 'accept':
-                        print(f"Connected to {bridge_name} on interface {interface}.........")
+                        print("Connected to {} on interface {}.........".format(bridge_name, interface))
                         self.all_connections.add(sock)
                         hostname, port = sock.getpeername()
                         station_ip = self.station_info[interface]["ip"]
@@ -214,7 +214,7 @@ class Station:
                 self.process_pending_queue()
             else:
                 print("Received ARP response destined for different station.......")
-        print("Enter the Destination or Type cmd for command: ", end="")
+        # print("Enter the Destination or Type cmd for command: ", end="")
 
     def process_frame(self, message, sock):
         print("\n")
@@ -266,7 +266,7 @@ class Station:
                 print('Message: {}'.format(ip_packet["message"]))
             else:
                 print('Received message destined for different station....dropping...')
-        print("Enter the Destination or Type cmd for command: ", end="")
+        # print("Enter the Destination or Type cmd for command: ", end="")
     
     def receive_message(self, message, sock):
         message = pickle.loads(message)
@@ -344,17 +344,17 @@ class Station:
                 if len(self.all_connections) == 0:
                     print('No active connections...')
                     break
-                # self.possible_inputs=[sys.stdin]+list(self.all_connections)
+                self.possible_inputs=[sys.stdin]+list(self.all_connections)
                 self.possible_inputs = list(self.all_connections)
                 # read_sockets,_, _ = select.select(self.possible_inputs,[],[])
                 # for sock in read_sockets:
                 for sock in self.possible_inputs:
                     #if client needs to send message to the server
-                    # if sock == sys.stdin:
-                    #     self.handle_input()
-                    # else:
-                    threading.Thread(target=self.handle_input).start()
-                    self.listen_message(sock)
+                    if sock == sys.stdin:
+                        self.handle_input()
+                    else:
+                        # threading.Thread(target=self.handle_input).start()
+                        self.listen_message(sock)
                                 
         except ConnectionRefusedError:
             print("Connection to the bridge refused. Exiting...")
