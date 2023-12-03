@@ -79,7 +79,7 @@ class Bridge:
 
     def print_tables(self, message):
         if message == 'bt':
-            print('\tMAC\t\tPort')
+            print('\tMAC\t\t\tPort')
             for k,v in self.bridge_table.items():
                 print('{}\t\t{}'.format(k, v))
         else:
@@ -94,11 +94,11 @@ class Bridge:
         # dest,command = str(usr_input).split(';')
         # dest,command = dest.strip(), command.strip()
 
-        dest = input("Enter the Destination or any command: ")
+        dest = input()
         command = input("Enter the Message or any command: ")
         dest,command = dest.strip(), command.strip()
 
-        if dest.lower() == 'print':
+        if dest.lower() == 'cmd':
             self.print_tables(command)
         else:
             print('Bridge only accepts command...')
@@ -117,6 +117,8 @@ class Bridge:
         #Waiting for connection set-up requests from stations / routers.
         try:
             while True:
+                print('\n==== Enter your input ========')
+                print("Enter the Destination Name or Type cmd for command: ")
                 read_sockets, write_socket, error_socket = select.select(list(self.all_connections1)+[sys.stdin],[],[])
                 # read_sockets, write_socket, error_socket = select.select(list(self.all_connections1),[],[])
                 for sock in read_sockets:
