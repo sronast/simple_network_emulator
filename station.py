@@ -1,7 +1,3 @@
-# import os
-# import json
-# import portalocker
-# import errno
 import sys
 import socket
 import pickle
@@ -33,7 +29,7 @@ class Station:
             #check if there is an active lan with lan_name
             all_bridges = load_json_file('all_lans.json')
             if bridge_name not in all_bridges:
-                print("LAN {} is unavilable ...".format(bridge_name))
+                print("LAN {} is unavailable ...".format(bridge_name))
                 print('\n')
                 continue
             lan_info = load_json_file('bridge_{}.json'.format(bridge_name))
@@ -333,16 +329,16 @@ class Station:
                 if len(self.all_connections) == 0:
                     print('No active connections...')
                     break
-                # self.possible_inputs = [sys.stdin]+list(self.all_connections)
-                self.possible_inputs = list(self.all_connections)
-                # read_sockets,_, _ = select.select(self.possible_inputs,[],[])
-                # for sock in read_sockets:
-                for sock in self.possible_inputs:
+                self.possible_inputs = [sys.stdin]+list(self.all_connections)
+                # self.possible_inputs = list(self.all_connections)
+                read_sockets,_, _ = select.select(self.possible_inputs,[],[])
+                for sock in read_sockets:
+                # for sock in self.possible_inputs:
                     #if client needs to send message to the server
                     if sock == sys.stdin:
                         self.handle_input()
                     else:
-                        threading.Thread(target=self.handle_input).start()
+                        # threading.Thread(target=self.handle_input).start()
                         for conn in self.all_connections.copy():
                         #if client receives message from the server
                             if sock == conn:
@@ -358,10 +354,6 @@ class Station:
                                             time.sleep(wait_time)
                                 except socket.timeout:
                                     pass
-                                except KeyboardInterrupt:
-                                    print('\n!!! Keyboard interrupt !!!')
-                                    for conn in self.all_connections.copy():
-                                        self.disconnect_from_lan(conn)
                                 if message:
                                     self.receive_message(message, sock)
                                 #if message is empty, the server has died

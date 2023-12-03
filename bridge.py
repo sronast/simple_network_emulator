@@ -117,8 +117,8 @@ class Bridge:
         #Waiting for connection set-up requests from stations / routers.
         try:
             while True:
-                # read_sockets, write_socket, error_socket = select.select(list(self.all_connections1)+[sys.stdin],[],[])
-                read_sockets, write_socket, error_socket = select.select(list(self.all_connections1),[],[])
+                read_sockets, write_socket, error_socket = select.select(list(self.all_connections1)+[sys.stdin],[],[])
+                # read_sockets, write_socket, error_socket = select.select(list(self.all_connections1),[],[])
                 for sock in read_sockets:
                     #if server receives a new connection 
                     if sock == self.server_socket:
@@ -148,7 +148,7 @@ class Bridge:
                         self.handle_input()
                     
                     else:
-                        threading.Thread(target=self.handle_input).start()
+                        # threading.Thread(target=self.handle_input).start()
                         hostname,port = sock.getpeername()
                         #which port is receiving the message
                         port_of_bridge =  self.station_ip_to_port['{}:{}'.format(hostname, port)]
@@ -166,9 +166,6 @@ class Bridge:
                                         time.sleep(wait_time)
                             except socket.timeout:
                                 pass
-                            except KeyboardInterrupt:
-                                print('\n!!! Keyboard interrupt !!!')
-                                self.server_socket.close()
                             if not message:
                                 self.free_bridge_port(port_of_bridge, sock)
                                 continue

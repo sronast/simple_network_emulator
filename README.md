@@ -1,11 +1,13 @@
 Project 2
 ## Start the Bridge
-`python3 bridge.py lan-name number_of_ports`
 
-## Input format to send message from one station to another
-destination_name;message
-
-# Input format for executing commands for printing info.
-Routing table: print;rt
-DNS table: print;dns
-ARP table: print;arp
+### Run Commands:
+python bridge.py cs1 8
+python bridge.py cs2 8
+python bridge.py cs3 8
+python station.py -route ifaces/ifaces_r1.json rtables/rtable_r1.json hosts.json
+python station.py -route ifaces/ifaces_r2.json rtables/rtable_r2.json hosts.json
+python station.py -no ifaces/ifaces_a.json rtables/rtable_a.json hosts.json
+python station.py -no ifaces/ifaces_b.json rtables/rtable_b.json hosts.json
+python station.py -no ifaces/ifaces_c.json rtables/rtable_c.json hosts.json
+python station.py -no ifaces/ifaces_d.json rtables/rtable_d.json hosts.json
