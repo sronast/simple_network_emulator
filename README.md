@@ -1,5 +1,6 @@
-Project 2
-## Start the Bridge
+## Project 2
+
+#### Contributers: Varun Totakura, Ronast Subedi
 
 ### Run Commands:
 - python bridge.py cs1 8
