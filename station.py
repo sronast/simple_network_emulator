@@ -51,7 +51,7 @@ class Station:
         for key in keys_to_remove:
             return_keys.append(self.time_table[key]['sock'])
             del self.time_table[key]
-            print("Removed entry for key: {}".format(key))
+            print("As time difference is {}. Removed entry for key: {}".format(time_difference, key))
         return return_keys
 
     def connect_to_lans(self):
@@ -120,6 +120,12 @@ class Station:
             for k,v in self.arp_table.items():
                 print('{} \t {}'.format(k, v))
             ## implement here 
+            print('============ END ===========')
+        elif message == 'tt':
+            print('=========== Printing Time Table ===============')
+            print('\Key\t\t\Time')
+            for k,v in self.time_table.items():
+                print('{}\t\t{}'.format(k, v))
             print('============ END ===========')
         else:
             print('Command {} not found'.format(message))

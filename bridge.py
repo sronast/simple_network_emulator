@@ -59,7 +59,7 @@ class Bridge:
         for key in keys_to_remove:
             return_keys.append(self.time_table[key]['sock'])
             del self.time_table[key]
-            print("Removed entry for key: {}".format(key))
+            print("As time difference is {}. Removed entry for key: {}".format(time_difference, key))
         return return_keys
 
     def unicast(self, frame, destination_mac):
@@ -113,6 +113,10 @@ class Bridge:
         if message == 'bt':
             print('\tMAC\t\t\tPort')
             for k,v in self.bridge_table.items():
+                print('{}\t\t{}'.format(k, v))
+        if message == 'tt':
+            print('\Key\t\t\Time')
+            for k,v in self.time_table.items():
                 print('{}\t\t{}'.format(k, v))
         else:
             print('Command {} not found'.format(message))
