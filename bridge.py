@@ -195,10 +195,11 @@ class Bridge:
                         hostname,port = sock.getpeername()
                         #which port is receiving the message
                         port_of_bridge =  self.station_ip_to_port['{}:{}'.format(hostname, port)]
-                        if self.close_socks:
-                            for cs in self.close_socks:
-                                self.free_bridge_port(port_of_bridge, cs)
                         try:
+                            if self.close_socks:
+                                for cs in self.close_socks:
+                                    self.free_bridge_port(port_of_bridge, cs)
+                                    continue
                             #message is a frame which contains source and destination mac addresses
                             try:
                                 retries = 5

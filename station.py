@@ -372,10 +372,6 @@ class Station:
                     print('No active connections...')
                     break
                 self.possible_inputs = [sys.stdin]+list(self.all_connections)
-                if self.close_socks:
-                    for cs in self.close_socks:
-                        self.disconnect_from_lan(cs)
-                    break
                 # self.possible_inputs = list(self.all_connections)
                 read_sockets,_, _ = select.select(self.possible_inputs,[],[])
                 for sock in read_sockets:
@@ -407,7 +403,9 @@ class Station:
                                 else:
                                     self.disconnect_from_lan(sock)
                             # break
-                                
+                if self.close_socks:
+                    for cs in self.close_socks:
+                        self.disconnect_from_lan(cs)            
         except ConnectionRefusedError:
             print("Connection to the bridge refused. Exiting...")
         except KeyboardInterrupt:
