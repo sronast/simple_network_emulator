@@ -117,7 +117,7 @@ class Bridge:
         if message == 'tt':
             print('\Key\t\t\Time')
             for k,v in self.time_table.items():
-                print('{}\t\t{}'.format(k, v))
+                print('{}\t\t{}'.format(v['sock'], v['time']))
         else:
             print('Command {} not found'.format(message))
         return
