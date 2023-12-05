@@ -33,6 +33,7 @@ class Bridge:
 
         self.timeout = 60  # Set the timeout in seconds
         self.time_table = {}
+        self.close_socks = None
     
     def add_time(self, key):
         # Call this as soon as a connection is established or updated
@@ -60,7 +61,7 @@ class Bridge:
             return_keys.append(self.time_table[key]['sock'])
             del self.time_table[key]
             print("As time difference is {}. Removed entry for key: {}".format(time_difference, key))
-        return return_keys
+        self.close_socks = return_keys
 
     def unicast(self, frame, destination_mac):
         print('Bridge Table')
@@ -154,6 +155,7 @@ class Bridge:
         try:
             for conn in self.all_connections1:
                 self.add_time(conn)
+            threading.Thread(target=self.check_time).start()
             while True:
                 print('\n==== Enter your input ========')
                 print("Enter the Destination Name or Type cmd for command: ")
@@ -193,9 +195,8 @@ class Bridge:
                         hostname,port = sock.getpeername()
                         #which port is receiving the message
                         port_of_bridge =  self.station_ip_to_port['{}:{}'.format(hostname, port)]
-                        close_socks = self.check_time()
-                        if close_socks:
-                            for cs in close_socks:
+                        if self.close_socks:
+                            for cs in self.close_socks:
                                 self.free_bridge_port(port_of_bridge, cs)
                         try:
                             #message is a frame which contains source and destination mac addresses

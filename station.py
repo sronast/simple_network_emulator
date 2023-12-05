@@ -25,6 +25,7 @@ class Station:
 
         self.timeout = 60  # Set the timeout in seconds
         self.time_table = {}
+        self.close_socks = None
 
     def add_time(self, key):
         # Call this as soon as a connection is established or updated
@@ -52,7 +53,7 @@ class Station:
             return_keys.append(self.time_table[key]['sock'])
             del self.time_table[key]
             print("As time difference is {}. Removed entry for key: {}".format(time_difference, key))
-        return return_keys
+        self.close_socks = return_keys
 
     def connect_to_lans(self):
         # print(self.station_info["stations"])
@@ -360,9 +361,10 @@ class Station:
         try:
             #try connecting to lans 
             self.connect_to_lans()
+            # print('Enter the message in format: destination_name;message')
             for conn in self.all_connections:
                 self.add_time(conn)
-            # print('Enter the message in format: destination_name;message')
+            threading.Thread(target=self.check_time).start()
             while True:
                 print('\n==== Enter your input ========')
                 print("Enter the Destination Name or Type cmd for command: ")
@@ -370,9 +372,8 @@ class Station:
                     print('No active connections...')
                     break
                 self.possible_inputs = [sys.stdin]+list(self.all_connections)
-                close_socks = self.check_time()
-                if close_socks:
-                    for cs in close_socks:
+                if self.close_socks:
+                    for cs in self.close_socks:
                         self.disconnect_from_lan(cs)
                     break
                 # self.possible_inputs = list(self.all_connections)
