@@ -30,25 +30,24 @@ class Station:
     def add_time(self, key):
         # Call this as soon as a connection is established or updated
         now_time = datetime.now()
-        self.time_table[str(key).split(',')[0].split("=")[1]] = {'sock': key, 'time': now_time}
+        self.time_table[str(key).split(',')[0].split("=")[1]] = {'sock': key, 'time': now_time, 'diff': None}
 
     def update_time(self, key):
         # Call this as soon as a connection is established or updated
         now_time = datetime.now()
-        self.time_table[str(key).split(',')[0].split("=")[1]] = {'sock': key, 'time': now_time}
+        # time_difference = now_time - self.time_table[str(key).split(',')[0].split("=")[1]]['time']
+        self.time_table[str(key).split(',')[0].split("=")[1]] = {'sock': key, 'time': now_time, 'diff': None}
 
     def check_time(self):
+        print("Checking Connection Time.....")
         keys_to_remove = []
         return_keys = []
-
         for key, value in self.time_table.items():
             time_difference = datetime.now() - value['time']
-
+            self.time_table[key]['diff'] = time_difference
             # To remove entries where the time difference exceeds the timeout
             if time_difference > timedelta(seconds=self.timeout):
                 keys_to_remove.append(key)
-                print(key, time_difference)
-
         # Remove entries from the time table
         for key in keys_to_remove:
             return_keys.append(self.time_table[key]['sock'])
@@ -125,9 +124,9 @@ class Station:
             print('============ END ===========')
         elif message == 'tt':
             print('=========== Printing Time Table ===============')
-            print('\Key\t\t\Time')
+            print('Key\t\tTimeDiff')
             for k,v in self.time_table.items():
-                print('{}\t\t{}'.format(str(v['sock']).split(',')[0].split("=")[1], v['time']))
+                print('{}\t\t{}'.format(str(v['sock']).split(',')[0].split("=")[1], v['diff']))
             print('============ END ===========')
         else:
             print('Command {} not found'.format(message))
@@ -258,7 +257,6 @@ class Station:
                 print("Received ARP response destined for different station.......")
 
     def process_frame(self, message, sock):
-        
         socket_ip, socket_port = sock.getpeername()
         my_ip = self.socket_to_ip['{}:{}'.format(socket_ip, socket_port)]
         my_name =  self.reverse_hostname_mapping[my_ip]
@@ -365,9 +363,9 @@ class Station:
             # print('Enter the message in format: destination_name;message')
             for conn in self.all_connections:
                 self.add_time(conn)
-            threading.Thread(target=self.check_time).start()
-            # threading.Thread(target=self.handle_input).start()
             while True:
+                # threading.Thread(target=self.handle_input).start()
+                self.check_time()
                 print('\n==== Enter your input ========')
                 print("Enter the Destination Name or Type cmd for command: ")
                 if len(self.all_connections) == 0:

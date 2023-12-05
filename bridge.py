@@ -38,25 +38,24 @@ class Bridge:
     def add_time(self, key):
         # Call this as soon as a connection is established or updated
         now_time = datetime.now()
-        self.time_table[str(key).split(',')[0].split("=")[1]] = {'sock': key, 'time': now_time}
+        self.time_table[str(key).split(',')[0].split("=")[1]] = {'sock': key, 'time': now_time, 'diff': None}
 
     def update_time(self, key):
         # Call this as soon as a connection is established or updated
         now_time = datetime.now()
-        self.time_table[str(key).split(',')[0].split("=")[1]] = {'sock': key, 'time': now_time}
+        # time_difference = now_time - self.time_table[str(key).split(',')[0].split("=")[1]]['time']
+        self.time_table[str(key).split(',')[0].split("=")[1]] = {'sock': key, 'time': now_time, 'diff': None}
 
     def check_time(self):
+        print("Checking Connection Time.....")
         keys_to_remove = []
         return_keys = []
-
         for key, value in self.time_table.items():
             time_difference = datetime.now() - value['time']
-
+            self.time_table[key]['diff'] = time_difference
             # To remove entries where the time difference exceeds the timeout
             if time_difference > timedelta(seconds=self.timeout):
                 keys_to_remove.append(key)
-                print(key, time_difference)
-
         # Remove entries from the time table
         for key in keys_to_remove:
             return_keys.append(self.time_table[key]['sock'])
@@ -117,9 +116,9 @@ class Bridge:
             for k,v in self.bridge_table.items():
                 print('{}\t\t{}'.format(k, v))
         if message == 'tt':
-            print('\Key\t\t\Time')
+            print('Key\t\tTimeDiff')
             for k,v in self.time_table.items():
-                print('{}\t\t{}'.format(str(v['sock']).split(',')[0].split("=")[1], v['time']))
+                print('{}\t\t{}'.format(str(v['sock']).split(',')[0].split("=")[1], v['diff']))
         else:
             print('Command {} not found'.format(message))
         return
@@ -156,9 +155,9 @@ class Bridge:
         try:
             for conn in self.all_connections1:
                 self.add_time(conn)
-            threading.Thread(target=self.check_time).start()
-            # threading.Thread(target=self.handle_input).start()
             while True:
+                # threading.Thread(target=self.handle_input).start()
+                self.check_time()
                 print('\n==== Enter your input ========')
                 print("Enter the Destination Name or Type cmd for command: ")
                 read_sockets, write_socket, error_socket = select.select(list(self.all_connections1)+[sys.stdin],[],[])
