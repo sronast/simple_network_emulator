@@ -7,6 +7,7 @@ import time
 import threading
 from collections import deque
 from utils import *
+from datetime import datetime, timedelta
 
 class Station:
     def __init__(self, interface_file, routingtable_file, hostname_file, is_router=True):
@@ -21,6 +22,37 @@ class Station:
         self.all_connections = set()
         self.socket_to_ip = {}
         self.ip_to_socket = {}
+
+        self.timeout = 60  # Set the timeout in seconds
+        self.time_table = {}
+
+    def add_time(self, key):
+        # Call this as soon as a connection is established or updated
+        now_time = datetime.now()
+        self.time_table[str(key)] = {'sock': key, 'time': now_time}
+
+    def update_time(self, key):
+        # Call this as soon as a connection is established or updated
+        now_time = datetime.now()
+        self.time_table[str(key)] = {'sock': key, 'time': now_time}
+
+    def check_time(self):
+        keys_to_remove = []
+        return_keys = []
+
+        for key, value in self.time_table.items():
+            time_difference = datetime.now() - value['time']
+
+            # To remove entries where the time difference exceeds the timeout
+            if time_difference > timedelta(seconds=self.timeout):
+                keys_to_remove.append(key)
+
+        # Remove entries from the time table
+        for key in keys_to_remove:
+            return_keys.append(self.time_table[key]['sock'])
+            del self.time_table[key]
+            print("Removed entry for key: {}".format(key))
+        return return_keys
 
     def connect_to_lans(self):
         # print(self.station_info["stations"])
@@ -200,7 +232,7 @@ class Station:
         # if message['source_ip'] not in self.arp_table:
         #     self.arp_table[message['source_ip']] = message['source_mac']
 
-        print(f'received {message["type"]} at {my_name}')
+        print('received {} at {}'.format(message['type'], my_name))
         if message['type'] == 'ARP_request':
             
             if my_ip == destination_ip:
@@ -225,7 +257,7 @@ class Station:
         ip_packet = message['ip_packet']
         destination_ip = ip_packet['destination_ip']
         source_ip = ip_packet['source_ip']
-        print(f'Received {message} at {my_name}')
+        print('Received Message {} at {}'.format(ip_packet['message'], my_name))
         if self.is_router:
             print(self.ip_to_socket)
             ########1 dec #######
@@ -322,6 +354,8 @@ class Station:
         try:
             #try connecting to lans 
             self.connect_to_lans()
+            for conn in self.all_connections:
+                self.add_time(conn)
             # print('Enter the message in format: destination_name;message')
             while True:
                 print('\n==== Enter your input ========')
@@ -330,6 +364,11 @@ class Station:
                     print('No active connections...')
                     break
                 self.possible_inputs = [sys.stdin]+list(self.all_connections)
+                close_socks = self.check_time()
+                if close_socks:
+                    for cs in close_socks:
+                        self.disconnect_from_lan(cs)
+                    break
                 # self.possible_inputs = list(self.all_connections)
                 read_sockets,_, _ = select.select(self.possible_inputs,[],[])
                 for sock in read_sockets:
@@ -356,6 +395,7 @@ class Station:
                                     pass
                                 if message:
                                     self.receive_message(message, sock)
+                                    self.update_time(sock)
                                 #if message is empty, the server has died
                                 else:
                                     self.disconnect_from_lan(sock)

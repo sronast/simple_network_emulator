@@ -7,6 +7,7 @@ import select
 import time
 import threading
 from utils import *
+from datetime import datetime, timedelta
 
 class Bridge:
     def __init__(self, lan_name, num_ports):
@@ -29,6 +30,37 @@ class Bridge:
         #port to mac
         self.reverse_bridge_table = {}
         self.available_ports = set(list(range(self.num_ports)))
+
+        self.timeout = 60  # Set the timeout in seconds
+        self.time_table = {}
+    
+    def add_time(self, key):
+        # Call this as soon as a connection is established or updated
+        now_time = datetime.now()
+        self.time_table[str(key)] = {'sock': key, 'time': now_time}
+
+    def update_time(self, key):
+        # Call this as soon as a connection is established or updated
+        now_time = datetime.now()
+        self.time_table[str(key)] = {'sock': key, 'time': now_time}
+
+    def check_time(self):
+        keys_to_remove = []
+        return_keys = []
+
+        for key, value in self.time_table.items():
+            time_difference = datetime.now() - value['time']
+
+            # To remove entries where the time difference exceeds the timeout
+            if time_difference > timedelta(seconds=self.timeout):
+                keys_to_remove.append(key)
+
+        # Remove entries from the time table
+        for key in keys_to_remove:
+            return_keys.append(self.time_table[key]['sock'])
+            del self.time_table[key]
+            print("Removed entry for key: {}".format(key))
+        return return_keys
 
     def unicast(self, frame, destination_mac):
         print('Bridge Table')
@@ -116,6 +148,8 @@ class Bridge:
 
         #Waiting for connection set-up requests from stations / routers.
         try:
+            for conn in self.all_connections1:
+                self.add_time(conn)
             while True:
                 print('\n==== Enter your input ========')
                 print("Enter the Destination Name or Type cmd for command: ")
@@ -131,6 +165,7 @@ class Bridge:
                         if self.used_ports < self.num_ports:
                             self.used_ports += 1 
                             self.all_connections1.add(connection)
+                            self.update_time(connection)
                             #assign random port of the bridge to the client
                             random_port_of_bridge = self.available_ports.pop()
                             self.station_ip_to_port['{}:{}'.format(address[0], address[1])] = random_port_of_bridge
@@ -154,6 +189,10 @@ class Bridge:
                         hostname,port = sock.getpeername()
                         #which port is receiving the message
                         port_of_bridge =  self.station_ip_to_port['{}:{}'.format(hostname, port)]
+                        close_socks = self.check_time()
+                        if close_socks:
+                            for cs in close_socks:
+                                self.free_bridge_port(port_of_bridge, cs)
                         try:
                             #message is a frame which contains source and destination mac addresses
                             try:
@@ -181,6 +220,7 @@ class Bridge:
                                 continue
                             #bridge receives the frame
                             else:
+                                self.update_time(sock)
                                 print('Received frame from a station....')
                                 source_mac = frame['source_mac']
                                 destination_mac = frame['destination_mac']
