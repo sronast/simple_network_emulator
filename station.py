@@ -30,12 +30,12 @@ class Station:
     def add_time(self, key):
         # Call this as soon as a connection is established or updated
         now_time = datetime.now()
-        self.time_table[str(key)] = {'sock': key, 'time': now_time}
+        self.time_table[str(key).split(',')[0].split("=")[1]] = {'sock': key, 'time': now_time}
 
     def update_time(self, key):
         # Call this as soon as a connection is established or updated
         now_time = datetime.now()
-        self.time_table[str(key)] = {'sock': key, 'time': now_time}
+        self.time_table[str(key).split(',')[0].split("=")[1]] = {'sock': key, 'time': now_time}
 
     def check_time(self):
         keys_to_remove = []
@@ -47,6 +47,7 @@ class Station:
             # To remove entries where the time difference exceeds the timeout
             if time_difference > timedelta(seconds=self.timeout):
                 keys_to_remove.append(key)
+                print(key, time_difference)
 
         # Remove entries from the time table
         for key in keys_to_remove:
@@ -126,7 +127,7 @@ class Station:
             print('=========== Printing Time Table ===============')
             print('\Key\t\t\Time')
             for k,v in self.time_table.items():
-                print('{}\t\t{}'.format(v['sock'], v['time']))
+                print('{}\t\t{}'.format(str(v['sock']).split(',')[0].split("=")[1], v['time']))
             print('============ END ===========')
         else:
             print('Command {} not found'.format(message))
@@ -365,6 +366,7 @@ class Station:
             for conn in self.all_connections:
                 self.add_time(conn)
             threading.Thread(target=self.check_time).start()
+            # threading.Thread(target=self.handle_input).start()
             while True:
                 print('\n==== Enter your input ========')
                 print("Enter the Destination Name or Type cmd for command: ")
@@ -380,7 +382,6 @@ class Station:
                     if sock == sys.stdin:
                         self.handle_input()
                     else:
-                        # threading.Thread(target=self.handle_input).start()
                         for conn in self.all_connections.copy():
                         #if client receives message from the server
                             if sock == conn:
@@ -405,7 +406,8 @@ class Station:
                             # break
                 if self.close_socks:
                     for cs in self.close_socks:
-                        self.disconnect_from_lan(cs)            
+                        self.disconnect_from_lan(cs)   
+                    self.close_socks = None         
         except ConnectionRefusedError:
             print("Connection to the bridge refused. Exiting...")
         except KeyboardInterrupt:
