@@ -34,7 +34,7 @@ The designed network emulator supports layer 2 and layer 3 of the OSI(Open Syste
 7. A TCP socket, ready to accept connections, is created as the bridge starts. Its name, IP address and port number are saved in a file.
 8. Every time a station/router is connected to a bridge, the bridge keeps its record. Similarly, the station/router obtains the bridge's IP and port from the saved file(see 7).
 9. As long as there is a link between two devices, they can communicate.
-10. The sender encapsulates its message in the IP packet. The IP layer also obtains the MAC address of the next-hop router or the destination station(if in the same LAN). Then, the packet is passed to the bridge.
+10. The sender encapsulates its message in the IP packet. The IP layer also obtains the MAC address of the next-hop router or the destination station(if in the same LAN). Then, the packet is passed to the layer 2. 
 11. The receiver can receive two types of frames:  ARP packet(request or response) and an IP packet.
     1. If the packet is an ARP request packet, the receiving station checks if the packet's destination address is its IP address. If true, it stores the mapping between the sender's IP and MAC address in its ARP table. Moreover, it also sends an ARP reply packet to the sender.
     2. If the packet is an ARP reply packet, the sender's IP and MAC address are recorded receiver's ARP table.
