@@ -11,7 +11,7 @@ The designed network emulator supports layer 2 and layer 3 of the OSI(Open Syste
 
 ### Routers
 1. Each router has a static routing table loaded from the configuration file.
-2. Performs hop-by-hop message forwarding based on the routing table
+2. Performs hop-by-hop IP packet forwarding based on the routing table
 
 ### Stations
 1. Communicate with one another through message passing.
@@ -42,15 +42,32 @@ The designed network emulator supports layer 2 and layer 3 of the OSI(Open Syste
 
 
 ## Configuration Files
+These files are saved in **ifaces** and **rtables** folders. Pre and correct configuration is necessary to run the project.
 
 
-## Example Commands:
-- python bridge.py cs1 8
+## Example scripts to run the project:
+- python bridge.py cs1 8  (creates a bridge named cs1, which has a maximum of 8 ports)
 - python bridge.py cs2 8
 - python bridge.py cs3 8
-- python station.py -route ifaces/ifaces_r1.json rtables/rtable_r1.json hosts.json
+- python station.py -route ifaces/ifaces_r1.json rtables/rtable_r1.json hosts.json (creates a router, loads its configurations from the JSON files, note flag -route for the router)
 - python station.py -route ifaces/ifaces_r2.json rtables/rtable_r2.json hosts.json
-- python station.py -no ifaces/ifaces_a.json rtables/rtable_a.json hosts.json
+- python station.py -no ifaces/ifaces_a.json rtables/rtable_a.json hosts.json (creates a station, loads its configurations from the JSON files, note flag -no for the station)
 - python station.py -no ifaces/ifaces_b.json rtables/rtable_b.json hosts.json
 - python station.py -no ifaces/ifaces_c.json rtables/rtable_c.json hosts.json
 - python station.py -no ifaces/ifaces_d.json rtables/rtable_d.json hosts.json
+
+## Additional device commands:
+In the terminal, type cmd then 
+### For Bridge
+Bridge supports two commands:
+1. bt: Shows IP: MAC mapping saved in the bridge table
+2. tt: Shows the time remaining for the saved entries in the bridge table to expire.
+
+### For Router/Station
+Router/Station supports following commands:
+1. rt: Printing routing table
+2. dns: Printing DNS table
+3. arp: Printing ARP table
+
+## Other features
+1. When a station/router/bridge gets killed, the TCP connection is closed, and all allocated memory is cleared
