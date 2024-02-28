@@ -36,9 +36,9 @@ The designed network emulator supports layer 2 and layer 3 of the OSI(Open Syste
 9. As long as there is a link between two devices, they can communicate.
 10. The sender encapsulates its message in the IP packet. The IP layer also obtains the MAC address of the next-hop router or the destination station(if in the same LAN). Then, the packet is passed to the bridge.
 11. The receiver can receive two types of frames:  ARP packet(request or response) and an IP packet.
-    a. If the packet is an ARP request packet, the receiving station checks if the packet's destination address is its IP address. If true, it stores the mapping between the sender's IP and MAC address in its ARP table. Moreover, it also sends an ARP reply packet to the sender.
-    b. If the packet is an ARP reply packet, the sender's IP and MAC address are recorded receiver's ARP table.
-    c. If the packet is an IP packet, the receiver displays the contained message if it is the intended receiver; otherwise, the packet is dropped.
+    1. If the packet is an ARP request packet, the receiving station checks if the packet's destination address is its IP address. If true, it stores the mapping between the sender's IP and MAC address in its ARP table. Moreover, it also sends an ARP reply packet to the sender.
+    2. If the packet is an ARP reply packet, the sender's IP and MAC address are recorded receiver's ARP table.
+    3. If the packet is an IP packet, the receiver displays the contained message if it is the intended receiver; otherwise, the packet is dropped.
 
 
 ## Configuration Files
