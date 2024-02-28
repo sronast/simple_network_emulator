@@ -1,4 +1,7 @@
 # Simple Network Emulator
+![alt text](overview.png)
+
+![alt text](image.png)
 
 ## Project Description
 
@@ -71,3 +74,8 @@ Router/Station supports following commands:
 
 ## Other features
 1. When a station/router/bridge gets killed, the TCP connection is closed, and all allocated memory is cleared
+
+## Sample Demo
+
+![alt text](image-1.png)
+![alt text](image-2.png)
